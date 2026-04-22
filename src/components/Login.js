@@ -69,7 +69,7 @@ function setupLoginListeners() {
         
         try {
             errDiv.classList.add('hidden');
-            const user = await authService.login(email, pass);
+            const user = await window.authService.login(email, pass);
             if (window.onLoginSuccess) window.onLoginSuccess(user);
         } catch (err) {
             console.error("Login Error:", err);
@@ -92,7 +92,7 @@ function setupLoginListeners() {
             return;
         }
         try {
-            await authService.resetPassword(email);
+            await window.authService.resetPassword(email);
             alert('E-mail de recuperação enviado!');
         } catch (err) {
             alert('Erro ao enviar e-mail.');
@@ -157,9 +157,9 @@ function renderRegister() {
 
         try {
             errDiv.classList.add('hidden');
-            const user = await authService.register(name, email, pass);
+            const user = await window.authService.register(name, email, pass);
             // Salva perfil inicial no Firestore
-            await dbService.saveProfile(user.uid, {
+            await window.dbService.saveProfile(user.uid, {
                 name: name,
                 initials: name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2),
                 email: email,

@@ -8,7 +8,7 @@
 - **🛡️ Autenticação Segura:** Sistema de login e cadastro completo via **Firebase Auth**, com persistência de sessão e recuperação de senha.
 - **📂 Gestão de Anexos:** Suporte para anexos em tarefas (limite de 1MB por arquivo no plano gratuito), salvos diretamente no banco de dados.
 - **⚡ Performance Assíncrona:** Toda a lógica do app foi migrada para operações assíncronas, garantindo uma interface fluida que nunca trava durante o salvamento.
-- **🔄 Arquitetura Modular:** Código refatorado em serviços (`authService`, `dbService`) e componentes modernos.
+- **🔄 Arquitetura Global e Resiliente:** Scripts carregados sincronamente com Proxies de interceptação para serviços (`authService`, `dbService`), garantindo máxima estabilidade no escopo de execução.
 
 ## 🚀 Funcionalidades Principais
 

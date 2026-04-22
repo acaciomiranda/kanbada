@@ -81,6 +81,32 @@ Object.defineProperty(window, 'selectedTaskIds', {
     configurable: true
 });
 
+// --- ACESSO AOS SERVIÇOS GLOBAIS ---
+// auth.service.js e db.service.js são carregados antes de app.js e definem
+// window.authService / window.dbService. Os getters abaixo garantem que o
+// código interno do app.js sempre resolva o valor atual, mesmo que os serviços
+// sejam substituídos/reinicializados depois.
+function getAuthService() { return window.authService; }
+function getDbService()   { return window.dbService; }
+
+// Aliases diretos para uso sem prefixo window — funcionam mesmo dentro
+// de closures e funções async onde o escopo global pode não resolver.
+// IMPORTANTE: estes são getters computados na chamada, não cópias da referência.
+const authService = new Proxy({}, {
+    get(_, prop) {
+        const svc = window.authService;
+        if (!svc) throw new Error('[Kanbada] authService não está disponível. Verifique a ordem dos scripts.');
+        return typeof svc[prop] === 'function' ? svc[prop].bind(svc) : svc[prop];
+    }
+});
+const dbService = new Proxy({}, {
+    get(_, prop) {
+        const svc = window.dbService;
+        if (!svc) throw new Error('[Kanbada] dbService não está disponível. Verifique a ordem dos scripts.');
+        return typeof svc[prop] === 'function' ? svc[prop].bind(svc) : svc[prop];
+    }
+});
+
 // --- PERSISTÊNCIA DE DADOS (FIREBASE) ---
 async function saveTasks(task = null) {
     if (!currentUser) return;
