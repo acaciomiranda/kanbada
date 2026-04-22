@@ -7,6 +7,17 @@
 import { authService } from './services/auth.service.js';
 import { dbService } from './services/db.service.js';
 
+// Global Error Logging
+window.onerror = function(msg, url, line, col, error) {
+    console.error("Global Error Detected:", msg, "at", url, ":", line);
+    alert("Erro detectado: " + msg + "\nVerifique o console (F12) para detalhes.");
+    return false;
+};
+
+window.onunhandledrejection = function(event) {
+    console.error("Unhandled Promise Rejection:", event.reason);
+};
+
 // State
 let allTasks = [];
 let currentUser = null;
@@ -20,6 +31,7 @@ let viewMode = 'board'; // 'board', 'list', 'archive', 'recycle'
 let selectedTaskIds = []; // IDs das tarefas selecionadas para ações em massa
 let currentEditingSubtasks = []; // Subtarefas da tarefa sendo editada no momento
 let editingTaskId = null; // ID da tarefa que está sendo editada
+
 
 
 let allProjects = [
@@ -50,4 +62,773 @@ Object.defineProperty(window, 'selectedTaskIds', {
     configurable: true
 });
 
-// --- PERSISTÊNCIA DE DADOS (FIREBASE) ---\nasync function saveTasks(task = null) {\n    if (!currentUser) return;\n    try {\n        if (task) {\n            await dbService.saveTask(currentUser.uid, task);\n        }\n    } catch (e) {\n        console.error('Erro ao salvar tarefa no Firestore:', e);\n    }\n}\n\nasync function loadTasks() {\n    if (!currentUser) return;\n    try {\n        allTasks = await dbService.loadAllTasks(currentUser.uid);\n        window.renderBoard(allTasks);\n    } catch (e) {\n        console.error('Erro ao carregar tarefas do Firestore:', e);\n        allTasks = [];\n    }\n}\n\nasync function saveConfig() {\n    if (!currentUser) return;\n    try {\n        await dbService.saveConfig(currentUser.uid, allProjects, allColumns);\n    } catch (e) {\n        console.error('Erro ao salvar config no Firestore:', e);\n    }\n}\n\nasync function loadConfig() {\n    if (!currentUser) return;\n    try {\n        const config = await dbService.loadConfig(currentUser.uid);\n        if (config.board) {\n            if (config.board.projects) allProjects = config.board.projects;\n            if (config.board.columns) allColumns = config.board.columns;\n        }\n        if (config.profile) {\n            currentUser.name = config.profile.name || currentUser.displayName || 'Usuário';\n            currentUser.initials = config.profile.initials || currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);\n        } else {\n            currentUser.name = currentUser.displayName || 'Usuário';\n            currentUser.initials = currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);\n        }\n    } catch (e) {\n        console.error('Erro ao carregar config do Firestore:', e);\n    }\n}\n\n// --- UTILITÁRIOS ---\nwindow.showToast = function(msg, type = 'success') {\n    const toast = document.createElement('div');\n    toast.textContent = msg;\n    toast.className = `fixed bottom-6 right-6 z-[3000] px-4 py-3 rounded-lg text-sm font-bold shadow-2xl transition-all duration-300 animate-slide-up`;\n    \n    if (type === 'error') {\n        toast.style.background = '#FF6B8A';\n        toast.style.color = '#fff';\n    } else {\n        toast.style.background = '#2a2a44';\n        toast.style.color = '#e0e0ec';\n        toast.style.border = '1px solid rgba(255,255,255,0.1)';\n    }\n    \n    document.body.appendChild(toast);\n    setTimeout(() => {\n        toast.classList.add('opacity-0');\n        setTimeout(() => toast.remove(), 300);\n    }, 3000);\n};\n\n// --- AUTH (FIREBASE OBSERVER) ---\nfunction checkAuth() {\n    authService.onAuthChange(async (user) => {\n        if (user) {\n            currentUser = user;\n            await showApp();\n        } else {\n            currentUser = null;\n            hideApp();\n        }\n    });\n}\n\nasync function showApp() {\n    document.getElementById('login-root').classList.add('hidden');\n    document.getElementById('app').classList.remove('hidden');\n    \n    await loadConfig();\n    updateAvatars();\n    renderProjectsSidebar();\n    updateProjectSelects();\n    await loadTasks();\n    loadNotifications();\n}\n\nfunction hideApp() {\n    document.getElementById('app').classList.add('hidden');\n    document.getElementById('login-root').classList.remove('hidden');\n    if (window.renderLogin) window.renderLogin();\n}\n\nwindow.logout = async function() {\n    const confirmed = await window.customConfirm('Confirmar Saída', 'Deseja realmente sair? Suas tarefas estão sincronizadas.', false);\n    if (!confirmed) return;\n    await authService.logout();\n};\n\nfunction updateAvatars() {\n    if (!currentUser) return;\n    document.querySelectorAll('.avatar-user').forEach(av => {\n        av.textContent = currentUser.initials;\n    });\n    const nd = document.getElementById('user-display-name');\n    if (nd) nd.textContent = currentUser.name;\n    const em = document.getElementById('user-email');\n    if (em) em.textContent = currentUser.email;\n}\n\n// --- BOARD RENDERING ---\nwindow.renderBoard = function(data = allTasks) {\n    const container = document.getElementById('kanban-board-container');\n    if (!container) return;\n\n    if (viewMode === 'list') {\n        renderListView(getVisibleTasks(data));\n        return;\n    }\n\n    container.innerHTML = '';\n    const visibleTasks = getVisibleTasks(data);\n\n    allColumns.forEach(col => {\n        const colEl = document.createElement('div');\n        colEl.className = 'kanban-column w-80 flex-shrink-0 flex flex-col h-full group/col';\n        colEl.innerHTML = `\n            <div class=\"flex items-center justify-between mb-4 px-1\">\n                <div class=\"flex items-center gap-2\">\n                    <div class=\"w-1.5 h-1.5 rounded-full\" style=\"background: ${col.color}\"></div>\n                    <h3 class=\"font-bold text-sm tracking-wide text-[#9090b0] uppercase\">${col.title}</h3>\n                    <span id=\"count-${col.id}\" class=\"bg-[#1e1e36] text-[10px] font-bold text-gray-500 px-2 py-0.5 rounded-full border border-[#2a2a44]\">0</span>\n                </div>\n                <div class=\"flex items-center gap-1 opacity-0 group-hover/col:opacity-100 transition-opacity\">\n                    <button onclick=\"window.openModal('${col.id}')\" class=\"p-1.5 rounded-lg hover:bg-white/5 text-gray-500 hover:text-[#FF6B8A]\">\n                        <i data-lucide=\"plus\" class=\"w-4 h-4\"></i>\n                    </button>\n                    <button onclick=\"window.promptEditColumn('${col.id}')\" class=\"p-1.5 rounded-lg hover:bg-white/5 text-gray-500 hover:text-white\">\n                        <i data-lucide=\"more-horizontal\" class=\"w-4 h-4\"></i>\n                    </button>\n                </div>\n            </div>\n            <div id=\"col-${col.id}\" class=\"flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-1 pb-10 min-h-[100px]\"></div>\n        `;\n        container.appendChild(colEl);\n        \n        const tasks = visibleTasks.filter(t => t.status === col.id);\n        const colContent = document.getElementById(`col-${col.id}`);\n        const counter = document.getElementById(`count-${col.id}`);\n        if (counter) counter.textContent = tasks.length;\n        \n        tasks.forEach(t => colContent.appendChild(window.createTaskCard(t)));\n    });\n\n    if (window.lucide) window.lucide.createIcons({ scope: container });\n    initSortable();\n    updateBulkActionsUI();\n};\n\nfunction updateBulkActionsUI() {\n    const bulkBar = document.getElementById('bulk-actions');\n    const bulkCount = document.getElementById('bulk-count');\n    if (!bulkBar) return;\n\n    if (selectedTaskIds.length > 0) {\n        bulkBar.classList.remove('hidden');\n        bulkBar.classList.add('flex');\n        bulkCount.textContent = `${selectedTaskIds.length} selecionado(s)`;\n        \n        const statusSelect = document.getElementById('bulk-status-select');\n        if (statusSelect) {\n            const options = `<option value=\"\">Mover para...</option>` + \n                allColumns.map(c => `<option value=\"${c.id}\">${c.title}</option>`).join('');\n            statusSelect.innerHTML = options;\n        }\n    } else {\n        bulkBar.classList.add('hidden');\n        bulkBar.classList.remove('flex');\n    }\n}\n\n// --- MODAL LOGIC ---\nwindow.openModal = function(statusOrId = 'plan') {\n    const modal = document.getElementById('task-modal');\n    const form = document.getElementById('task-form');\n    editingTaskId = null;\n    currentEditingSubtasks = [];\n    \n    if (allTasks.find(t => t.__backendId.toString() === statusOrId.toString())) {\n        // Modo Edição\n        const task = allTasks.find(t => t.__backendId.toString() === statusOrId.toString());\n        editingTaskId = task.__backendId;\n        document.getElementById('modal-title').textContent = 'Editar Tarefa';\n        document.getElementById('f-title').value = task.title;\n        document.getElementById('f-date').value = task.due_date || '';\n        document.getElementById('f-assignee').value = task.assignee || '';\n        document.getElementById('f-project').value = task.project || 'Geral';\n        document.getElementById('f-tag').value = task.tag || '';\n        document.getElementById('f-tagcolor').value = task.tag_color || '#FF6B8A';\n        document.getElementById('f-description').value = task.description || '';\n        document.getElementById('f-status').value = task.status;\n        currentEditingSubtasks = task.subtasks ? JSON.parse(JSON.stringify(task.subtasks)) : [];\n    } else {\n        // Modo Nova Tarefa\n        form.reset();\n        document.getElementById('modal-title').textContent = 'Nova Tarefa';\n        const colId = (statusOrId && allColumns.some(c => c.id === statusOrId)) ? statusOrId : (allColumns[0] ? allColumns[0].id : 'plan');\n        document.getElementById('f-status').value = colId;\n        document.getElementById('f-project').value = currentProjectFilter || 'Geral';\n        const fileInput = document.getElementById('f-file');\n        if (fileInput) fileInput.value = '';\n    }\n\n    renderSubtasks();\n    modal.classList.remove('hidden');\n    document.getElementById('f-title').focus();\n    if (window.lucide) window.lucide.createIcons({ scope: modal });\n};\n\nwindow.closeModal = function() {\n    document.getElementById('task-modal').classList.add('hidden');\n    editingTaskId = null;\n};\n\n// --- SUBTASKS ---\nfunction renderSubtasks() {\n    const container = document.getElementById('subtasks-container');\n    const count = document.getElementById('subtask-count');\n    if (!container) return;\n\n    if (currentEditingSubtasks.length === 0) {\n        container.innerHTML = `<div class=\"text-center py-8 text-gray-600 italic text-xs border-2 border-dashed border-[#2a2a44] rounded-2xl\">Nenhuma subtarefa adicionada</div>`;\n        if (count) count.textContent = '0 itens';\n        return;\n    }\n\n    container.innerHTML = currentEditingSubtasks.map((s, i) => `\n        <div class=\"flex items-center gap-3 bg-[#12121f] p-3 rounded-xl border border-[#2a2a44] group\">\n            <input type=\"checkbox\" ${s.completed ? 'checked' : ''} onchange=\"window.toggleSubtaskInModal(${i})\"\n                class=\"w-4 h-4 rounded border-[#2a2a44] bg-[#1e1e36] text-[#FF6B8A] focus:ring-[#FF6B8A] cursor-pointer\">\n            <input type=\"text\" value=\"${s.text}\" onchange=\"window.updateSubtaskText(${i}, this.value)\"\n                class=\"flex-1 bg-transparent border-none outline-none text-xs ${s.completed ? 'line-through text-gray-500' : 'text-white'}\">\n            <button type=\"button\" onclick=\"window.removeSubtask(${i})\" class=\"text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity\">\n                <i data-lucide=\"trash-2\" class=\"w-3.5 h-3.5\"></i>\n            </button>\n        </div>\n    `).join('');\n    \n    if (count) count.textContent = `${currentEditingSubtasks.length} item(ns)`;\n    if (window.lucide) window.lucide.createIcons({ scope: container });\n}\n\nwindow.addSubtask = function() {\n    const input = document.getElementById('new-subtask-text');\n    const text = input.value.trim();\n    if (text) {\n        currentEditingSubtasks.push({ id: Date.now(), text, completed: false });\n        input.value = '';\n        renderSubtasks();\n        input.focus();\n    }\n};\n\nwindow.toggleSubtaskInModal = function(index) {\n    currentEditingSubtasks[index].completed = !currentEditingSubtasks[index].completed;\n    renderSubtasks();\n};\n\nwindow.updateSubtaskText = function(index, text) {\n    currentEditingSubtasks[index].text = text;\n};\n\nwindow.removeSubtask = function(index) {\n    currentEditingSubtasks.splice(index, 1);\n    renderSubtasks();\n};\n\n// --- HANDLE SUBMIT ---\nwindow.handleSubmit = async function(e) {\n    e.preventDefault();\n    const title = document.getElementById('f-title').value.trim();\n    if (!title) {\n        window.showToast('Título é obrigatório!', 'error');\n        return;\n    }\n\n    const fileInput = document.getElementById('f-file');\n    let fileData = null;\n    let filename = null;\n\n    if (fileInput && fileInput.files[0]) {\n        const file = fileInput.files[0];\n        filename = file.name;\n        \n        if (file.size > 1024 * 1024) {\n            window.showToast('Arquivo muito grande! Máximo 1MB no plano gratuito.', 'error');\n            return;\n        }\n\n        fileData = await new Promise((resolve) => {\n            const reader = new FileReader();\n            reader.onload = (ev) => resolve(ev.target.result);\n            reader.onerror = () => resolve(null);\n            reader.readAsDataURL(file);\n        });\n    }\n\n    const taskData = {\n        title: title,\n        due_date: document.getElementById('f-date').value || null,\n        assignee: document.getElementById('f-assignee').value.trim() || currentUser?.name || 'Usuário',\n        project: document.getElementById('f-project').value || 'Geral',\n        tag: document.getElementById('f-tag').value.trim() || '',\n        tag_color: document.getElementById('f-tagcolor').value,\n        description: document.getElementById('f-description').value,\n        status: document.getElementById('f-status').value,\n        subtasks: [...currentEditingSubtasks],\n        updatedAt: new Date().toISOString()\n    };\n\n    if (fileData) {\n        taskData.fileData = fileData;\n        taskData.filename = filename;\n    }\n\n    let targetTask = null;\n\n    if (editingTaskId) {\n        const index = allTasks.findIndex(t => t.__backendId.toString() === editingTaskId.toString());\n        if (index > -1) {\n            const oldTask = allTasks[index];\n            taskData.fileData = fileData || oldTask.fileData;\n            taskData.filename = filename || oldTask.filename;\n            \n            allTasks[index] = { ...allTasks[index], ...taskData };\n            targetTask = allTasks[index];\n            window.showToast('Tarefa atualizada!');\n        }\n    } else {\n        const newTask = {\n            ...taskData,\n            __backendId: crypto.randomUUID(),\n            createdAt: new Date().toISOString(),\n            archived: false,\n            deleted: false,\n            reactions: { thumbsUp: 0, heart: 0 }\n        };\n        allTasks.push(newTask);\n        targetTask = newTask;\n        window.showToast('Tarefa criada!');\n    }\n\n    if (targetTask) await saveTasks(targetTask);\n    window.closeModal();\n    window.renderBoard(allTasks);\n};\n\n// --- ACTIONS EM MASSA ---\nwindow.toggleTaskSelection = function(id, event) {\n    if (window.selectedTaskIds.includes(id)) {\n        window.selectedTaskIds = window.selectedTaskIds.filter(tid => tid !== id);\n    } else {\n        window.selectedTaskIds = [...window.selectedTaskIds, id];\n    }\n    window.renderBoard(allTasks);\n};\n\nwindow.clearSelection = function() {\n    window.selectedTaskIds = [];\n    window.renderBoard(allTasks);\n};\n\nwindow.bulkMoveToColumn = async function(columnId) {\n    if (window.selectedTaskIds.length === 0) return;\n    const col = allColumns.find(c => c.id === columnId);\n    if (!col) return;\n\n    const idsToMove = [...window.selectedTaskIds];\n    let moved = 0;\n    const tasksToSave = [];\n\n    idsToMove.forEach(id => {\n        const task = allTasks.find(t => t.__backendId.toString() === id.toString());\n        if (task && !task.deleted && !task.archived) {\n            task.status = columnId;\n            tasksToSave.push(task);\n            moved++;\n        }\n    });\n\n    if (moved === 0) return;\n\n    window.selectedTaskIds = [];\n    await dbService.batchSaveTasks(currentUser.uid, tasksToSave);\n    window.renderBoard(allTasks);\n    window.showToast(`${moved} tarefa(s) movida(s) para \"${col.title}\"!`);\n};\n\nwindow.bulkArchive = async function() {\n    if (window.selectedTaskIds.length === 0) return;\n\n    const idsToArchive = [...window.selectedTaskIds];\n    let archived = 0;\n    const tasksToSave = [];\n\n    idsToArchive.forEach(id => {\n        const task = allTasks.find(t => t.__backendId.toString() === id.toString());\n        if (task && !task.deleted && !task.archived) {\n            task.archived = true;\n            tasksToSave.push(task);\n            archived++;\n        }\n    });\n\n    window.selectedTaskIds = [];\n    if (tasksToSave.length > 0) {\n        await dbService.batchSaveTasks(currentUser.uid, tasksToSave);\n    }\n    window.renderBoard(allTasks);\n    window.showToast(`${archived} tarefa(s) arquivada(s)!`);\n};\n\nwindow.bulkDelete = async function() {\n    if (window.selectedTaskIds.length === 0) return;\n    \n    const confirmed = await window.customConfirm('Excluir Selecionados', `Deseja realmente excluir as ${window.selectedTaskIds.length} tarefas selecionadas?`, true);\n    if (!confirmed) return;\n\n    const idsToDelete = [...window.selectedTaskIds];\n    const toRecycle = [];\n    const toDeletePermanently = [];\n\n    idsToDelete.forEach(id => {\n        const task = allTasks.find(t => t.__backendId.toString() === id.toString());\n        if (task) {\n            if (task.deleted) {\n                toDeletePermanently.push(task);\n            } else {\n                task.deleted = true;\n                task.archived = false;\n                task.deletedAt = new Date().toISOString();\n                toRecycle.push(task);\n            }\n        }\n    });\n\n    window.selectedTaskIds = [];\n\n    for (const t of toDeletePermanently) {\n        await dbService.deleteTask(currentUser.uid, t.__backendId);\n        const idx = allTasks.indexOf(t);\n        if (idx > -1) allTasks.splice(idx, 1);\n    }\n\n    if (toRecycle.length > 0) {\n        await dbService.batchSaveTasks(currentUser.uid, toRecycle);\n    }\n\n    window.renderBoard(allTasks);\n    window.showToast(`${toRecycle.length + toDeletePermanently.length} tarefa(s) excluída(s)!`);\n};\n\n// --- DRAG AND DROP ---\nfunction initSortable() {\n    if (viewMode !== 'board') return; \n    sortableInstances.forEach(inst => inst.destroy());\n    sortableInstances = [];\n    \n    allColumns.forEach(col => {\n        const el = document.getElementById(`col-${col.id}`);\n        if (el) {\n            const inst = Sortable.create(el, {\n                group: 'kanban',\n                animation: 150,\n                onEnd: async (evt) => {\n                    const taskId = evt.item.dataset.id;\n                    const newStatus = evt.to.id.replace('col-', '');\n                    const task = allTasks.find(t => t.__backendId.toString() === taskId.toString());\n                    \n                    if (task) {\n                        const oldStatus = task.status;\n                        task.status = newStatus;\n                        await saveTasks(task);\n                        window.renderBoard(allTasks);\n                    }\n                }\n            });\n            sortableInstances.push(inst);\n        }\n    });\n}\n\n// --- DIALOGS ---\nwindow.customConfirm = function(title, msg, isDanger = false) {\n    return new Promise((resolve) => {\n        const dialog = document.getElementById('custom-dialog');\n        const icon = document.getElementById('dialog-icon');\n        const confirmBtn = document.getElementById('dialog-confirm');\n        \n        document.getElementById('dialog-title').textContent = title;\n        document.getElementById('dialog-msg').textContent = msg;\n        document.getElementById('dialog-input-container').classList.add('hidden');\n        \n        if (isDanger) {\n            icon.className = \"w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center mb-6 mx-auto text-red-500\";\n            confirmBtn.className = \"w-full bg-red-500 hover:bg-red-600 text-white font-extrabold py-3.5 rounded-xl transition-all shadow-lg shadow-red-500/20 active:scale-95\";\n        } else {\n            icon.className = \"w-16 h-16 rounded-2xl bg-[#FF6B8A]/10 flex items-center justify-center mb-6 mx-auto text-[#FF6B8A]\";\n            confirmBtn.className = \"w-full bg-[#FF6B8A] hover:bg-pink-600 text-white font-extrabold py-3.5 rounded-xl transition-all shadow-lg shadow-pink-500/20 active:scale-95\";\n        }\n        \n        dialog.classList.remove('hidden');\n        \n        confirmBtn.onclick = () => { dialog.classList.add('hidden'); resolve(true); };\n        document.getElementById('dialog-cancel').onclick = () => { dialog.classList.add('hidden'); resolve(false); };\n    });\n};\n\nwindow.customPrompt = function(title, msg, defaultValue = '') {\n    return new Promise((resolve) => {\n        const dialog = document.getElementById('custom-dialog');\n        const input = document.getElementById('dialog-input');\n        \n        document.getElementById('dialog-title').textContent = title;\n        document.getElementById('dialog-msg').textContent = msg;\n        document.getElementById('dialog-input-container').classList.remove('hidden');\n        input.value = defaultValue;\n        \n        dialog.classList.remove('hidden');\n        input.focus();\n        \n        document.getElementById('dialog-confirm').onclick = () => { dialog.classList.add('hidden'); resolve(input.value); };\n        document.getElementById('dialog-cancel').onclick = () => { dialog.classList.add('hidden'); resolve(null); };\n    });\n};\n\n// --- RENDER & FILTERS ---\nfunction getVisibleTasks(data = allTasks) {\n    let filtered = [];\n    if (viewMode === 'board' || viewMode === 'list') {\n        filtered = data.filter(t => !t.archived && !t.deleted);\n    } else if (viewMode === 'archive') {\n        filtered = data.filter(t => t.archived && !t.deleted);\n    } else if (viewMode === 'recycle') {\n        filtered = data.filter(t => t.deleted);\n    }\n\n    if (searchTerm) {\n        const search = searchTerm.toLowerCase();\n        filtered = filtered.filter(t => \n            (t.title || '').toLowerCase().includes(search) ||\n            (t.assignee || '').toLowerCase().includes(search) ||\n            (t.project || '').toLowerCase().includes(search)\n        );\n    }\n\n    if (currentProjectFilter && (viewMode === 'board' || viewMode === 'list')) {\n        filtered = filtered.filter(t => (t.project || 'Geral') === currentProjectFilter);\n    }\n\n    if (showOnlyMyTasks && currentUser) {\n        filtered = filtered.filter(t => \n            (t.assignee || '').toLowerCase().includes(currentUser.name.toLowerCase())\n        );\n    }\n    return filtered;\n}\n\n// --- INIT ---\ndocument.addEventListener('DOMContentLoaded', () => {\n    checkAuth();\n    \n    document.getElementById('search-input')?.addEventListener('input', (e) => {\n        searchTerm = e.target.value;\n        window.renderBoard(allTasks);\n    });\n});\n\nwindow.restoreTask = async function(id) {\n    const task = allTasks.find(t => t.__backendId.toString() === id.toString());\n    if (task) {\n        task.deleted = false;\n        task.archived = false;\n        await saveTasks(task);\n        window.renderBoard(allTasks);\n        window.showToast('Tarefa restaurada!');\n    }\n};\n\nwindow.archiveTask = async function(id) {\n    const task = allTasks.find(t => t.__backendId.toString() === id.toString());\n    if (task) {\n        task.archived = true;\n        await saveTasks(task);\n        window.renderBoard(allTasks);\n        window.showToast('Tarefa arquivada!');\n    }\n};\n\nwindow.toggleDelete = async function(id) {\n    const task = allTasks.find(t => t.__backendId.toString() === id.toString());\n    if (task) {\n        if (task.deleted) {\n            const confirmed = await window.customConfirm('Excluir Permanente', 'Deseja excluir esta tarefa definitivamente?', true);\n            if (confirmed) {\n                await dbService.deleteTask(currentUser.uid, id);\n                allTasks = allTasks.filter(t => t.__backendId !== id);\n                window.renderBoard(allTasks);\n                window.showToast('Tarefa excluída definitivamente!');\n            }\n        } else {\n            task.deleted = true;\n            task.archived = false;\n            await saveTasks(task);\n            window.renderBoard(allTasks);\n            window.showToast('Movida para a lixeira');\n        }\n    }\n};\n\nwindow.downloadAttachment = function(id) {\n    const task = allTasks.find(t => t.__backendId === id);\n    if (!task || !task.fileData) return;\n    \n    const link = document.createElement('a');\n    link.href = task.fileData;\n    link.download = task.filename || 'anexo';\n    link.click();\n};\n\nwindow.reactToTask = async function(id, type, event) {\n    if(event) event.stopPropagation();\n    const task = allTasks.find(t => t.__backendId.toString() === id.toString());\n    if (task) {\n        if (!task.reactions) task.reactions = { thumbsUp: 0, heart: 0 };\n        task.reactions[type] = (task.reactions[type] || 0) + 1;\n        await saveTasks(task);\n        window.renderBoard(allTasks);\n    }\n};\n\nwindow.changeTaskStatus = async function(id, newStatus, event) {\n    if(event) event.stopPropagation();\n    const task = allTasks.find(t => t.__backendId.toString() === id.toString());\n    if (task && newStatus) {\n        task.status = newStatus;\n        await saveTasks(task);\n        window.renderBoard(allTasks);\n    }\n};\n\nwindow.setView = function(mode) {\n    viewMode = mode;\n    document.querySelectorAll('#sidebar a').forEach(a => a.classList.remove('bg-white/10', 'text-white'));\n    const activeNav = document.getElementById('nav-' + mode);\n    if (activeNav) activeNav.classList.add('bg-white/10', 'text-white');\n    \n    const title = { board: 'Quadro Kanban', list: 'Vista em Lista', archive: 'Tarefas Arquivadas', recycle: 'Lixeira' };\n    const nd = document.getElementById('view-title');\n    if (nd) nd.textContent = title[mode];\n    \n    window.renderBoard(allTasks);\n};\n\nwindow.editTask = function(id) {\n    window.openModal(id);\n};\n\nfunction updateProjectSelects() {\n    const selects = document.querySelectorAll('#f-project');\n    selects.forEach(s => {\n        const current = s.value;\n        s.innerHTML = '<option value=\"Geral\">Geral</option>' + \n            allProjects.map(p => `<option value=\"${p.name}\">${p.name}</option>`).join('');\n        s.value = current || 'Geral';\n    });\n}\n\nfunction renderProjectsSidebar() {\n    const container = document.getElementById('projects-list-container');\n    if (!container) return;\n    container.innerHTML = allProjects.map(p => `\n        <div class=\"group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-all hover:bg-white/5 cursor-pointer ${currentProjectFilter === p.name ? 'bg-white/10 text-white' : 'text-gray-400'}\" \n             onclick=\"window.filterByProject('${p.name}')\">\n            <div class=\"flex items-center gap-3 truncate\">\n                <div class=\"w-2 h-2 rounded-full flex-shrink-0\" style=\"background: ${p.color}\"></div>\n                <span class=\"truncate\">${p.name}</span>\n            </div>\n        </div>\n    `).join('');\n}\n\nwindow.filterByProject = function(name) {\n    currentProjectFilter = (currentProjectFilter === name) ? null : name;\n    renderProjectsSidebar();\n    window.renderBoard(allTasks);\n};\n\nwindow.toggleMyTasks = function() {\n    showOnlyMyTasks = !showOnlyMyTasks;\n    const btn = document.getElementById('btn-filter-my');\n    if (showOnlyMyTasks) {\n        btn.classList.add('bg-[#FF6B8A]/20', 'text-[#FF6B8A]', 'border-[#FF6B8A]/30');\n    } else {\n        btn.classList.remove('bg-[#FF6B8A]/20', 'text-[#FF6B8A]', 'border-[#FF6B8A]/30');\n    }\n    window.renderBoard(allTasks);\n};\n\nfunction loadNotifications() {}\nfunction initSidebarListeners() {}\nfunction initNotificationListeners() {}\nfunction initKeyboardShortcuts() {}\nwindow.closeSidebar = () => {};\nwindow.openSidebar = () => {};\nwindow.toggleNotifications = () => {};\nwindow.clearNotifications = () => {};\nwindow.exportTasks = () => {};\nwindow.handleFileImport = () => {};\nwindow.openReports = () => {};\nwindow.promptEditColumn = () => {};\nwindow.promptNewProject = () => {};\nwindow.promptNewColumn = () => {};\nwindow.promptEditProject = () => {};\nfunction base64ToBlob(base64) {\n    const byteString = atob(base64.split(',')[1]);\n    const mimeString = base64.split(',')[0].split(':')[1].split(';')[0];\n    const ab = new ArrayBuffer(byteString.length);\n    const ia = new Uint8Array(ab);\n    for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);\n    return new Blob([ab], { type: mimeString });\n}\n
+// --- PERSISTÊNCIA DE DADOS (FIREBASE) ---
+async function saveTasks(task = null) {
+    if (!currentUser) return;
+    try {
+        if (task) {
+            await dbService.saveTask(currentUser.uid, task);
+        }
+    } catch (e) {
+        console.error('Erro ao salvar tarefa no Firestore:', e);
+    }
+}
+
+async function loadTasks() {
+    if (!currentUser) return;
+    try {
+        allTasks = await dbService.loadAllTasks(currentUser.uid);
+        window.renderBoard(allTasks);
+    } catch (e) {
+        console.error('Erro ao carregar tarefas do Firestore:', e);
+        allTasks = [];
+        window.renderBoard(allTasks);
+    }
+}
+
+function saveNotifications() {
+    if (!currentUser) return;
+    localStorage.setItem(`kanbada_notifications_${currentUser.uid}`, JSON.stringify(notifications));
+}
+
+function loadNotifications() {
+    if (!currentUser) return;
+    const saved = localStorage.getItem(`kanbada_notifications_${currentUser.uid}`);
+    if (saved) {
+        notifications = JSON.parse(saved);
+        updateNotificationUI();
+    }
+}
+
+async function saveConfig() {
+    if (!currentUser) return;
+    try {
+        await dbService.saveConfig(currentUser.uid, allProjects, allColumns);
+    } catch (e) {
+        console.error('Erro ao salvar config no Firestore:', e);
+    }
+}
+
+async function loadConfig() {
+    if (!currentUser) return;
+    try {
+        const config = await dbService.loadConfig(currentUser.uid);
+        if (config.board) {
+            if (config.board.projects) allProjects = config.board.projects;
+            if (config.board.columns) allColumns = config.board.columns;
+        }
+        if (config.profile) {
+            currentUser.name = config.profile.name || currentUser.displayName || 'Usuário';
+            currentUser.initials = config.profile.initials || currentUser.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+        }
+    } catch (e) {
+        console.error('Erro ao carregar config do Firestore:', e);
+    }
+}
+
+// --- UTILITÁRIOS ---
+window.showToast = function (msg, type = 'success') {
+    const toast = document.getElementById('toast');
+    if (!toast) return;
+    toast.textContent = msg;
+    toast.className = `fixed bottom-6 right-6 z-[3000] px-4 py-3 rounded-lg text-sm font-bold shadow-2xl transition-all duration-300 animate-slide-up`;
+
+    if (type === 'error') {
+        toast.style.background = '#FF6B8A';
+        toast.style.color = '#fff';
+    } else {
+        toast.style.background = '#2a2a44';
+        toast.style.color = '#e0e0ec';
+        toast.style.border = '1px solid rgba(255,255,255,0.1)';
+    }
+
+    toast.classList.remove('hidden');
+    setTimeout(() => {
+        toast.classList.add('opacity-0');
+        setTimeout(() => {
+            toast.classList.add('hidden');
+            toast.classList.remove('opacity-0');
+        }, 300);
+    }, 3000);
+};
+
+// --- AUTH (FIREBASE OBSERVER) ---
+function checkAuth() {
+    authService.onAuthChange(async (user) => {
+        console.log("Auth State Changed:", user ? "User Logged In" : "No User");
+        if (user) {
+            currentUser = user;
+            await showApp();
+        } else {
+            currentUser = null;
+            hideApp();
+        }
+    });
+}
+
+async function showApp() {
+    document.getElementById('login-root').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+
+    // Carregar dados na ordem correta
+    await loadConfig();
+    updateAvatars();
+    renderProjectsSidebar();
+    updateProjectSelects();
+    await loadTasks();
+    loadNotifications();
+
+    window.showToast(`Sessão ativa: ${currentUser.name}`);
+}
+
+function hideApp() {
+    document.getElementById('app').classList.add('hidden');
+    document.getElementById('login-root').classList.remove('hidden');
+    if (window.renderLogin) window.renderLogin();
+}
+
+window.onLoginSuccess = async (u) => {
+    currentUser = u;
+    await showApp();
+};
+
+function updateAvatars() {
+    if (!currentUser) return;
+    document.querySelectorAll('.avatar-user').forEach(av => {
+        av.textContent = currentUser.initials;
+    });
+    const nd = document.getElementById('user-display-name');
+    if (nd) nd.textContent = currentUser.name;
+}
+
+// --- LOGOUT ---
+window.logout = async function () {
+    const confirmed = await window.customConfirm('Confirmar Saída', 'Deseja realmente sair? Suas tarefas estão sincronizadas.', false);
+    if (!confirmed) return;
+    await authService.logout();
+    window.showToast('Você saiu com sucesso.');
+};
+
+// --- IMPORTAÇÃO CSV (usa xlsx para parsing robusto: suporta campos com vírgulas/aspas) ---
+function parseCSV(text) {
+    try {
+        // Usa a lib xlsx já carregada para parsear CSV de forma robusta
+        const workbook = XLSX.read(text, { type: 'string', raw: false });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        return XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    } catch (e) {
+        console.error('Erro ao parsear CSV via xlsx:', e);
+        // Fallback simples (sem suporte a aspas) — apenas para casos extremos
+        const lines = text.split('\n').filter(l => l.trim());
+        if (lines.length === 0) return [];
+        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+        return lines.slice(1).map(line => {
+            const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+            const obj = {};
+            headers.forEach((h, i) => { obj[h] = values[i] || ''; });
+            return obj;
+        });
+    }
+}
+
+// --- IMPORT ASANA/CSV ROBUSTO ---
+window.triggerImport = () => document.getElementById('asana-import-input').click();
+
+window.handleAsanaImport = function (e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const fileType = file.name.split('.').pop().toLowerCase();
+    window.showToast('Processando arquivo...');
+
+    if (fileType === 'csv') {
+        // Processar CSV
+        const reader = new FileReader();
+        reader.onload = function (evt) {
+            try {
+                const csvText = evt.target.result;
+                const data = parseCSV(csvText);
+
+                if (!window.dataMapper) throw new Error('Data Mapper não carregado.');
+                const newTasks = window.dataMapper.transformAsanaData(data);
+
+                if (newTasks.length === 0) {
+                    window.showToast('Nenhuma tarefa válida encontrada no CSV.', 'error');
+                    return;
+                }
+
+                checkDuplicatesAndImport(newTasks);
+            } catch (err) {
+                console.error('Erro CSV:', err);
+                window.showToast('Erro ao ler CSV: ' + err.message, 'error');
+            }
+        };
+        reader.readAsText(file);
+    } else if (fileType === 'xlsx' || fileType === 'xls') {
+        // Processar Excel
+        const reader = new FileReader();
+        reader.onload = function (evt) {
+            try {
+                const data = new Uint8Array(evt.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+                // Detecção de cabeçalho
+                const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+                let headerIndex = 0;
+                const keywords = ['name', 'nome', 'task', 'tarefa', 'projeto', 'project'];
+
+                for (let i = 0; i < Math.min(rows.length, 10); i++) {
+                    const row = rows[i];
+                    if (Array.isArray(row)) {
+                        const hasKeywords = row.some(cell =>
+                            cell && keywords.includes(cell.toString().toLowerCase().trim())
+                        );
+                        if (hasKeywords) {
+                            headerIndex = i;
+                            break;
+                        }
+                    }
+                }
+
+                const rawData = XLSX.utils.sheet_to_json(sheet, { range: headerIndex });
+
+                if (!window.dataMapper) throw new Error('Data Mapper não carregado.');
+                const newTasks = window.dataMapper.transformAsanaData(rawData);
+
+                if (newTasks.length === 0) {
+                    window.showToast('Nenhuma tarefa válida no Excel.', 'error');
+                    return;
+                }
+
+                checkDuplicatesAndImport(newTasks);
+            } catch (err) {
+                console.error("Erro Excel:", err);
+                window.showToast('Erro: ' + (err.message || 'Falha ao ler Excel'), 'error');
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    } else {
+        window.showToast('Formato não suportado. Use .xlsx, .xls ou .csv', 'error');
+    }
+
+    e.target.value = ''; // Reset
+};
+
+function checkDuplicatesAndImport(newTasks) {
+    const duplicates = newTasks.filter(nt =>
+        allTasks.some(at =>
+            normalizeString(at.title) === normalizeString(nt.title)
+        )
+    );
+
+    if (duplicates.length > 0) {
+        pendingImportTasks = newTasks;
+        document.getElementById('import-modal-msg').innerHTML =
+            `O arquivo contém <strong>${newTasks.length}</strong> tarefas.<br>Detectamos <strong>${duplicates.length}</strong> duplicatas.<br><br>Como deseja prosseguir?`;
+        document.getElementById('import-modal').classList.remove('hidden');
+    } else {
+        completeImport(newTasks);
+    }
+}
+
+function normalizeString(str) {
+    return str.toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+        .trim();
+}
+
+window.confirmImport = function (mode) {
+    document.getElementById('import-modal').classList.add('hidden');
+    if (mode === 'cancel') {
+        pendingImportTasks = [];
+        return;
+    }
+
+    if (mode === 'replace') {
+        const newTitles = pendingImportTasks.map(t => normalizeString(t.title));
+        allTasks = allTasks.filter(t => !newTitles.includes(normalizeString(t.title)));
+        completeImport(pendingImportTasks);
+    } else {
+        completeImport(pendingImportTasks);
+    }
+    pendingImportTasks = [];
+};
+
+async function completeImport(tasks) {
+    if (!currentUser) return;
+    try {
+        window.showToast(`Importando ${tasks.length} tarefas...`);
+        await dbService.batchSaveTasks(currentUser.uid, tasks);
+        allTasks = [...allTasks, ...tasks];
+        window.renderBoard(allTasks);
+        window.showToast(`${tasks.length} tarefas importadas!`);
+        addNotification(`${tasks.length} tarefas importadas.`);
+    } catch (e) {
+        console.error('Erro no batch import:', e);
+        window.showToast('Erro ao importar para o banco de dados.', 'error');
+    }
+}
+
+// --- GOOGLE SHEETS IMPORT ---
+window.importGoogleSheets = async function () {
+    const url = await window.customPrompt('Importar Google Sheets', 'Cole o link público da planilha:');
+    if (!url) return;
+
+    const sheetId = url.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
+    if (!sheetId) {
+        window.showToast('Link inválido. Certifique-se de colar a URL completa.', 'error');
+        return;
+    }
+
+    const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+
+    window.showToast('Importando do Google Sheets...');
+
+    fetch(csvUrl)
+        .then(r => {
+            if (!r.ok) throw new Error('Planilha não é pública ou não existe');
+            return r.text();
+        })
+        .then(csvText => {
+            const data = parseCSV(csvText);
+            const newTasks = window.dataMapper.transformAsanaData(data);
+            if (newTasks.length === 0) {
+                window.showToast('Nenhuma tarefa encontrada na planilha.', 'error');
+                return;
+            }
+            checkDuplicatesAndImport(newTasks);
+        })
+        .catch(err => {
+            console.error('Erro Google Sheets:', err);
+            window.showToast('Erro: Certifique-se que a planilha é pública', 'error');
+        });
+};
+
+// --- EXPORTAR DADOS ---
+window.exportTasks = function () {
+    const dataStr = JSON.stringify(allTasks, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `kanbada_backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    window.showToast('Backup exportado com sucesso!');
+};
+
+function cleanupRecycleBin() {
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const initialLen = allTasks.length;
+    allTasks = allTasks.filter(t => {
+        if (t.deleted && t.deletedAt) {
+            const delDate = new Date(t.deletedAt).getTime();
+            return delDate > sevenDaysAgo;
+        }
+        return true;
+    });
+    if (allTasks.length !== initialLen) saveTasks();
+}
+
+// --- RENDER & FILTERS ---
+function getVisibleTasks(data = allTasks) {
+    let filtered = [];
+    if (viewMode === 'board' || viewMode === 'list') {
+        filtered = data.filter(t => !t.archived && !t.deleted);
+    } else if (viewMode === 'archive') {
+        filtered = data.filter(t => t.archived && !t.deleted);
+    } else if (viewMode === 'recycle') {
+        filtered = data.filter(t => t.deleted);
+    }
+
+    if (searchTerm) {
+        const search = searchTerm.toLowerCase();
+        filtered = filtered.filter(t =>
+            (t.title || '').toLowerCase().includes(search) ||
+            (t.assignee || '').toLowerCase().includes(search) ||
+            (t.project || '').toLowerCase().includes(search)
+        );
+    }
+
+    if (currentProjectFilter && (viewMode === 'board' || viewMode === 'list')) {
+        filtered = filtered.filter(t => (t.project || 'Geral') === currentProjectFilter);
+    }
+
+    if (showOnlyMyTasks && currentUser) {
+        filtered = filtered.filter(t =>
+            (t.assignee || '').toLowerCase().includes(currentUser.name.toLowerCase())
+        );
+    }
+    return filtered;
+}
+
+window.renderBoard = function (data) {
+    cleanupRecycleBin();
+    const boardTitle = document.getElementById('board-title');
+    const filtered = getVisibleTasks(data);
+
+    // Atualiza indicadores de filtro
+    const filterIndicator = document.getElementById('filter-indicator');
+    if (filterIndicator) {
+        if (currentProjectFilter && (viewMode === 'board' || viewMode === 'list')) {
+            filterIndicator.classList.remove('hidden');
+        } else {
+            filterIndicator.classList.add('hidden');
+        }
+    }
+
+    // Se estiver em modo lista, renderiza tabela e sai
+    if (viewMode === 'list') {
+        if (boardTitle && (viewMode === 'board' || viewMode === 'list')) boardTitle.textContent = 'Quadro de Tarefas';
+        renderListView(filtered);
+        updateBulkBar();
+        return;
+    }
+
+    let colsToRender = [];
+    if (viewMode === 'board') {
+        colsToRender = allColumns;
+        if (boardTitle) boardTitle.textContent = 'Quadro de Tarefas';
+    } else if (viewMode === 'archive') {
+        const archivedProjects = [...new Set(filtered.map(t => t.project || 'Geral'))];
+        const knownProjects = new Set(['Geral', ...allProjects.map(p => p.name)]);
+        const extraProjects = archivedProjects.filter(p => !knownProjects.has(p));
+
+        colsToRender = [
+            { id: 'proj_Geral', title: 'Geral', color: '#9090b0', filterKey: 'Geral' },
+            ...allProjects.map(p => ({ id: 'proj_' + p.name.replace(/\s+/g, '_'), title: p.name, color: p.color, filterKey: p.name })),
+            ...extraProjects.map(p => ({ id: 'proj_extra_' + p.replace(/\s+/g, '_'), title: p, color: '#6a6a8e', filterKey: p }))
+        ];
+        if (boardTitle) boardTitle.textContent = 'Arquivo (Por Projeto)';
+    } else if (viewMode === 'recycle') {
+        colsToRender = [{ id: 'lixeira', title: 'Lixeira (Últimos 7 dias)', color: '#FF6B8A' }];
+        if (boardTitle) boardTitle.textContent = 'Reciclagem';
+    }
+
+    const container = document.getElementById('kanban-board-container');
+    if (container) {
+        let boardHtml = colsToRender.map(col => `
+            <div class="flex flex-col" style="width:320px;min-width:300px;flex-shrink:0">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <span style="width:10px;height:10px;border-radius:50%;background:${col.color}"></span>
+                        <span class="font-semibold text-sm" style="color:#e0e0ec">${col.title}</span>
+                        <span id="count-${col.id}" class="text-xs px-2 py-0.5 rounded-full" style="background:#2a2a44;color:#9090b0">0</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        ${viewMode === 'board' ? `
+                            <button onclick="window.promptEditColumn('${col.id}')" class="text-gray-500 hover:text-blue-400 p-1" title="Editar coluna"><i data-lucide="edit-2" class="w-3.5 h-3.5"></i></button>
+                            <button onclick="window.promptDeleteColumn('${col.id}')" class="text-gray-500 hover:text-[#FF6B8A] p-1" title="Excluir coluna"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                            <button onclick="window.openModal('${col.id}')" class="add-btn hover:text-[${col.color}] transition-colors ml-1" style="color:#9090b0" title="Adicionar tarefa">
+                                <i data-lucide="plus" style="width:18px;height:18px"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+                <div id="col-${col.id}" class="kanban-col flex flex-col gap-3 flex-1 overflow-y-auto pr-1" data-status="${col.id}"></div>
+            </div>
+        `).join('');
+
+        if (viewMode === 'board') {
+            boardHtml += `
+                <div class="flex-shrink-0 w-full lg:w-[320px] pb-10 lg:pb-0">
+                    <button onclick="window.promptNewColumn()"
+                        class="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-[#2a2a44] text-[#9090b0] hover:border-[#FF6B8A] hover:text-[#FF6B8A] transition-colors mt-2 lg:mt-[48px] w-full h-fit">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        <span class="font-bold text-sm">Adicionar Coluna</span>
+                    </button>
+                </div>
+            `;
+        }
+        container.innerHTML = boardHtml;
+    }
+
+    colsToRender.forEach(col => {
+        let tasks = [];
+        if (viewMode === 'board') tasks = filtered.filter(t => t.status === col.id);
+        else if (viewMode === 'archive') tasks = filtered.filter(t => t.project === col.filterKey);
+        else if (viewMode === 'recycle') tasks = filtered;
+
+        const colEl = document.getElementById(`col-${col.id}`);
+        const countEl = document.getElementById(`count-${col.id}`);
+        if (colEl) {
+            colEl.innerHTML = '';
+            if (countEl) countEl.textContent = tasks.length;
+            tasks.forEach(t => colEl.appendChild(window.createTaskCard(t)));
+        }
+    });
+
+    if (window.lucide) window.lucide.createIcons({ scope: container });
+    initSortable();
+    updateProjectSelects();
+    updateBulkBar();
+};
+
+window.clearFilters = function () {
+    currentProjectFilter = null;
+    showOnlyMyTasks = false;
+    searchTerm = '';
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) searchInput.value = '';
+    document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+    const navHome = document.getElementById('nav-home');
+    if (navHome) navHome.classList.add('active');
+    window.renderBoard(allTasks);
+};
+
+// --- RELATÓRIOS ---
+window.showReports = function () {
+    const activeTasks = allTasks.filter(t => !t.deleted && !t.archived);
+    const total = activeTasks.length;
+
+    // Contagens por coluna (dinâmico)
+    const byCols = allColumns.map(col => ({
+        id: col.id,
+        title: col.title,
+        color: col.color,
+        count: activeTasks.filter(t => t.status === col.id).length
+    }));
+
+    // Última coluna = "concluído" para taxa de conclusão
+    const lastCol = allColumns[allColumns.length - 1];
+    const doneCount = lastCol ? activeTasks.filter(t => t.status === lastCol.id).length : 0;
+    const completionRate = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+
+    // Tarefas atrasadas
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const overdue = activeTasks.filter(t => {
+        if (!t.due_date || t.status === lastCol?.id) return false;
+        const d = new Date(t.due_date); d.setHours(0, 0, 0, 0);
+        return d < today;
+    }).length;
+
+    // Por projeto
+    const byProject = {};
+    activeTasks.forEach(t => {
+        const p = t.project || 'Geral';
+        if (!byProject[p]) byProject[p] = { total: 0, done: 0 };
+        byProject[p].total++;
+        if (lastCol && t.status === lastCol.id) byProject[p].done++;
+    });
+
+    // Por responsável
+    const byAssignee = {};
+    activeTasks.forEach(t => {
+        const a = t.assignee || 'Sem responsável';
+        if (!byAssignee[a]) byAssignee[a] = 0;
+        byAssignee[a]++;
+    });
+    const topAssignees = Object.entries(byAssignee).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+    // Tarefas sem data de entrega
+    const noDate = activeTasks.filter(t => !t.due_date).length;
+
+    // Render
+    const modal = document.getElementById('reports-modal');
+    const content = document.getElementById('reports-content');
+    if (!modal || !content) return;
+
+    const colBars = byCols.map(col => {
+        const pct = total > 0 ? Math.round((col.count / total) * 100) : 0;
+        return `
+        <div>
+            <div class="flex items-center justify-between mb-1">
+                <div class="flex items-center gap-2">
+                    <span style="width:8px;height:8px;border-radius:50%;background:${col.color};flex-shrink:0"></span>
+                    <span class="text-xs text-gray-300 truncate" style="max-width:120px">${col.title}</span>
+                </div>
+                <span class="text-xs font-bold" style="color:${col.color}">${col.count}</span>
+            </div>
+            <div class="rounded-full overflow-hidden" style="height:6px;background:#2a2a44">
+                <div class="h-full rounded-full transition-all" style="width:${pct}%;background:${col.color}"></div>
+            </div>
+        </div>`;
+    }).join('');
+
+    const projectRows = Object.entries(byProject).sort((a, b) => b[1].total - a[1].total).map(([name, data]) => {
+        const pct = data.total > 0 ? Math.round((data.done / data.total) * 100) : 0;
+        return `
+        <div class="flex items-center justify-between py-2" style="border-bottom:1px solid #2a2a44">
+            <span class="text-xs text-gray-300 truncate flex-1 mr-4">${name}</span>
+            <div class="flex items-center gap-3">
+                <div class="rounded-full overflow-hidden" style="width:80px;height:4px;background:#2a2a44">
+                    <div class="h-full rounded-full" style="width:${pct}%;background:#00C9A7"></div>
+                </div>
+                <span class="text-xs font-mono" style="color:#9090b0;min-width:40px;text-align:right">${data.done}/${data.total}</span>
+                <span class="text-xs font-bold" style="color:${pct === 100 ? '#00C9A7' : '#9090b0'};min-width:36px;text-align:right">${pct}%</span>
+            </div>
+        </div>`;
+    }).join('');
+
+    const assigneeRows = topAssignees.map(([name, count]) => `
+        <div class="flex items-center gap-2 py-1.5">
+            <div class="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0"
+                style="background:linear-gradient(135deg,#FF6B8A,#c850c0)">
+                ${name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+            </div>
+            <span class="text-xs text-gray-300 truncate flex-1">${name}</span>
+            <span class="text-xs font-bold px-2 py-0.5 rounded-full" style="background:#2a2a44;color:#9090b0">${count}</span>
+        </div>`).join('');
+
+    content.innerHTML = `
+        <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center gap-3">
+                <div class="p-2 rounded-xl" style="background:rgba(108,99,255,0.15)">
+                    <i data-lucide="bar-chart-2" style="width:20px;height:20px;color:#6C63FF"></i>
+                </div>
+                <div>
+                    <h2 class="font-bold text-base text-white">Relatórios</h2>
+                    <p class="text-xs" style="color:#9090b0">Visão geral do quadro</p>
+                </div>
+            </div>
+            <button onclick="document.getElementById('reports-modal').classList.add('hidden')"
+                style="color:#9090b0" title="Fechar">
+                <i data-lucide="x" style="width:20px;height:20px"></i>
+            </button>
+        </div>
+
+        <!-- KPIs -->
+        <div class="grid grid-cols-2 gap-3 mb-6" style="grid-template-columns:repeat(4,1fr)">
+            <div class="p-4 rounded-xl" style="background:#12121f;border:1px solid #2a2a44">
+                <p class="text-[10px] uppercase tracking-wider mb-1" style="color:#6a6a8e">Total</p>
+                <p class="text-2xl font-bold text-white">${total}</p>
+            </div>
+            <div class="p-4 rounded-xl" style="background:#12121f;border:1px solid #2a2a44">
+                <p class="text-[10px] uppercase tracking-wider mb-1" style="color:#6a6a8e">Concluídas</p>
+                <p class="text-2xl font-bold" style="color:#00C9A7">${doneCount}</p>
+            </div>
+            <div class="p-4 rounded-xl" style="background:#12121f;border:1px solid #2a2a44">
+                <p class="text-[10px] uppercase tracking-wider mb-1" style="color:#6a6a8e">Taxa de Conclusão</p>
+                <p class="text-2xl font-bold" style="color:${completionRate >= 75 ? '#00C9A7' : completionRate >= 40 ? '#FFB84D' : '#FF6B8A'}">${completionRate}%</p>
+            </div>
+            <div class="p-4 rounded-xl" style="background:#12121f;border:1px solid #2a2a44">
+                <p class="text-[10px] uppercase tracking-wider mb-1" style="color:#6a6a8e">Atrasadas</p>
+                <p class="text-2xl font-bold" style="color:${overdue > 0 ? '#FF6B8A' : '#9090b0'}">${overdue}</p>
+            </div>
+        </div>
+
+        <div class="grid gap-5" style="grid-template-columns:1fr 1fr">
+            <!-- Distribuição por Coluna -->
+            <div class="p-4 rounded-xl" style="background:#12121f;border:1px solid #2a2a44">
+                <h3 class="text-xs font-bold text-white mb-4 uppercase tracking-wider">Distribuição por Coluna</h3>
+                ${total === 0 ? '<p class="text-xs text-gray-500 italic text-center py-4">Nenhuma tarefa ainda</p>' : `<div class="space-y-3">${colBars}</div>`}
+            </div>
+
+            <!-- Responsáveis -->
+            <div class="p-4 rounded-xl" style="background:#12121f;border:1px solid #2a2a44">
+                <h3 class="text-xs font-bold text-white mb-4 uppercase tracking-wider">Top Responsáveis</h3>
+                ${topAssignees.length === 0 ? '<p class="text-xs text-gray-500 italic text-center py-4">Nenhum responsável atribuído</p>' : assigneeRows}
+            </div>
+        </div>
+
+        <!-- Por Projeto -->
+        <div class="mt-5 p-4 rounded-xl" style="background:#12121f;border:1px solid #2a2a44">
+            <h3 class="text-xs font-bold text-white mb-2 uppercase tracking-wider">Progresso por Projeto</h3>
+            ${Object.keys(byProject).length === 0
+            ? '<p class="text-xs text-gray-500 italic text-center py-4">Nenhuma tarefa com projeto</p>'
+            : projectRows}
+        </div>
+
+        <!-- Info adicional -->
+        <div class="mt-4 flex gap-4 text-[10px]" style="color:#6a6a8e">
+            <span>📁 Arquivadas: ${allTasks.filter(t => t.archived && !t.deleted).length}</span>
+            <span>🗑️ Na lixeira: ${allTasks.filter(t => t.deleted).length}</span>
+            <span>📅 Sem prazo: ${noDate}</span>
+        </div>
+    `;
+
+    modal.classList.remove('hidden');
+    if (window.lucide) window.lucide.createIcons({ scope: content });
+};
+
+window.closeReportsModal = function () {
+    document.getElementById('reports-modal').classList.add('hidden');
+};
+
+// --- APP INIT & LISTENERS ---
+function initSidebarListeners() {
+    document.getElementById('nav-home').addEventListener('click', () => {
+        viewMode = 'board';
+        const bt = document.getElementById('board-title');
+        if (bt) bt.textContent = 'Quadro de Tarefas';
+        window.clearFilters();
+    });
+
+    document.getElementById('nav-my-tasks').addEventListener('click', (e) => {
+        viewMode = 'board';
+        const bt = document.getElementById('board-title');
+        if (bt) bt.textContent = 'Quadro de Tarefas';
+        document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+        e.currentTarget.classList.add('active');
+        showOnlyMyTasks = true;
+        currentProjectFilter = null;
+        window.renderBoard(allTasks);
+    });
+
+    document.getElementById('nav-reports').addEventListener('click', (e) => {
+        document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+        e.currentTarget.classList.add('active');
+        window.showReports();
+        if (window.innerWidth < 1024) window.closeSidebar();
+    });
+
+    document.getElementById('nav-archive')?.addEventListener('click', (e) => {
+        viewMode = 'archive';
+        document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+        e.currentTarget.classList.add('active');
+        currentProjectFilter = null;
+        window.renderBoard(allTasks);
+        if (window.innerWidth < 1024) window.closeSidebar();
+    });
+
+    document.getElementById('nav-recycle')?.addEventListener('click', (e) => {
+        viewMode = 'recycle';
+        document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+        e.currentTarget.classList.add('active');
+        currentProjectFilter = null;
+        window.renderBoard(allTasks);
+        if (window.innerWidth < 1024) window.closeSidebar();
+    });
+}
+
+// --- INIT ---
+document.addEventListener('DOMContentLoaded', () => {
+    console.log("DOMContentLoaded fired. Starting checkAuth...");
+    checkAuth();
+
+    document.getElementById('search-input')?.addEventListener('input', (e) => {
+        searchTerm = e.target.value;
+        window.renderBoard(allTasks);
+    });
+    
+    initSidebarListeners();
+});
+
+function updateProjectSelects() {
+    const selects = document.querySelectorAll('#f-project');
+    selects.forEach(s => {
+        const current = s.value;
+        s.innerHTML = '<option value="Geral">Geral</option>' +
+            allProjects.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+        s.value = current || 'Geral';
+    });
+}
+
+function renderProjectsSidebar() {
+    const container = document.getElementById('projects-list-container');
+    if (!container) return;
+    container.innerHTML = allProjects.map(p => `
+        <div class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-all hover:bg-white/5 cursor-pointer ${currentProjectFilter === p.name ? 'bg-white/10 text-white' : 'text-gray-400'}" 
+             onclick="window.filterByProject('${p.name}')">
+            <div class="flex items-center gap-3 truncate">
+                <div class="w-2 h-2 rounded-full flex-shrink-0" style="background: ${p.color}"></div>
+                <span class="truncate">${p.name}</span>
+            </div>
+        </div>
+    `).join('');
+}

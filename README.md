@@ -69,6 +69,15 @@ kanbada/
    ```
 2. Abra o `index.html` em um servidor local (Live Server ou similar).
 
+## 🛠️ Solução de Problemas (Troubleshooting)
+
+Se o aplicativo carregar uma **tela em branco** na produção:
+
+1. **Rastreamento e Cookies:** O Firebase requer acesso ao `localStorage`. Verifique se o seu navegador não está bloqueando "cookies de terceiros" ou se o modo de "Proteção Contra Rastreamento" (Brave, Safari, Edge) está muito rigoroso.
+2. **Autorização de Domínio:** Certifique-se de que o domínio `acaciomiranda.com` está na lista de "Domínios Autorizados" no Console do Firebase (Autenticação > Configurações).
+3. **Erros no Console:** Pressione `F12` e verifique a aba "Console". Procure por erros em vermelho. Se vir `Auth State Changed`, o Firebase inicializou corretamente.
+4. **Cache:** Tente um "Hard Refresh" com `Ctrl + Shift + R`.
+
 ## 🤝 Contribuindo
 
 Se você tiver alguma ideia ou encontrar algum erro, sinta-se à vontade para enviar um Pull Request.
