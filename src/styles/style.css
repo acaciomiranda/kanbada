@@ -422,7 +422,7 @@ select:focus-visible {
 }
 
 /* ===== TRANSIÇÕES SUAVES ===== */
-* {
+button, a, .sidebar-item, .project-item, .nav-item, .kanban-col button, .modal-overlay, .modal-content {
     transition-property: color, background-color, border-color, opacity, transform;
     transition-duration: 0.2s;
     transition-timing-function: ease;

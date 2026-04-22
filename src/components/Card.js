@@ -18,7 +18,7 @@ window.createTaskCard = function(task, deletingId = null, toggleDelete = () => {
     const dueDate = task.due_date || null;
     const assignee = escapeHtml(task.assignee || 'Sem responsável');
     const project = escapeHtml(task.project || 'Geral');
-    const tag = escapeHtml(task.tag || 'Tarefa');
+    const tag = escapeHtml(task.tag || '');
     const description = escapeHtml(task.description || '');
     const filename = escapeHtml(task.filename || '');
     const reactions = task.reactions || { thumbsUp: 0, heart: 0 };

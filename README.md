@@ -5,67 +5,71 @@
 ## 🚀 Principais Funcionalidades
 
 - **Gerenciamento Dinâmico:** Crie, edite e organize projetos e colunas conforme sua metodologia de trabalho.
-- **Relatórios Avançados:** Dashboard visual com KPIs (total, concluídas, taxa de conclusão, atrasadas), progresso por coluna, por projeto e ranking de responsáveis.
-- **Cartões Detalhados:** Adicione prazo, etiquetas (tags) com cores customizáveis, responsáveis e descrições profundas.
-- **Gestão de Status Dinâmica:** Arraste e solte cartões (Drag & Drop) entre colunas ou altere rapidamente o status diretamente pelo seletor dentro da tarefa.
-- **Interatividade Total:** Edição com apenas um clique sobre o card, com acesso imediato a arquivos anexados (suporte indicativo de até 1GB).
-- **Sistema de Reações:** Deixe curtidas (👍) ou amei (❤️) para facilitar a comunicação e priorização.
-- **Espaço Seguro:** Tarefas concluídas podem ser **Arquivadas** por projeto. Tarefas apagadas vão para a **Reciclagem (Lixeira)** e ficam aguardando por 7 dias, podendo ser restauradas ou excluídas permanentemente.
-- **Experiência Mobile:** Menu lateral responsivo com overlay e suporte a gestos de clique para fechar a navegação.
-- **Backup e Exportação:** Exporte backups em JSON ou gere planilhas CSV compatíveis com o Asana.
-- **Autenticação Multi-usuário:** Sistema de login e cadastro seguro com hash SHA-256 local e suporte para múltiplas contas no mesmo navegador.
+- **⚡ Ações em Massa (Bulk Operations):** Selecione múltiplas tarefas simultaneamente para:
+  - **Mover para Coluna:** Transfira várias tarefas de uma só vez para qualquer coluna existente.
+  - **Seleção Inteligente:** Selecione tudo ou todas as tarefas de um status específico com um clique.
+  - **Arquivamento e Exclusão:** Limpe seu quadro rapidamente arquivando ou removendo itens em lote.
+- **💎 Interface Premium:** Modais customizados substituem os diálogos nativos do sistema (prompt/confirm), garantindo uma experiência fluida e integrada.
+- **📊 Relatórios Avançados:** Dashboard visual com KPIs (total, concluídas, taxa de conclusão, atrasadas), progresso por coluna, por projeto e ranking de responsáveis.
+- **🏷️ Cartões Detalhados:** Adicione prazo, etiquetas (tags) com cores customizáveis, responsáveis e descrições ricas.
+- **🔄 Gestão de Status Dinâmica:** Arraste e solte cartões (Drag & Drop) entre colunas ou altere rapidamente o status diretamente pelo card.
+- **🔔 Notificações & Feedback:** Sistema de alertas internos com opção de limpeza rápida para manter o foco.
+- **📁 Espaço Seguro:** Tarefas concluídas podem ser **Arquivadas**. Itens apagados vão para a **Reciclagem** por 7 dias antes da exclusão permanente.
+- **📲 Experiência Mobile:** Interface totalmente responsiva, otimizada para toques e visualização em telas pequenas.
+- **📥 Exportação e Importação:** Backup em JSON ou planilhas CSV compatíveis com o Asana (incluindo indicadores de status ativo/arquivado).
 
 ## 🛠️ Tecnologias e Dependências
 
 - **Frontend Core:** HTML5, CSS3, e JavaScript ES6+ (Vanilla).
 - **Design System:** [Tailwind CSS](https://tailwindcss.com/) via CDN para estilização rápida e responsiva.
-- **Ícones Ativos:** [Lucide Icons](https://lucide.dev/) para uma iconografia elegante e profissional.
-- **Drag & Drop:** [SortableJS](https://sortablejs.github.io/Sortable/) garantindo fluidez ao mover cartões no quadro.
-- **Leitura de Dados (XLSX/CSV):** [SheetJS](https://sheetjs.com/) utilizado na lógica de extração inteligente de importações.
-- **Armazenamento Local:** Uso nativo de `localStorage` para retenção dos dados no lado do cliente.
+- **Ícones Ativos:** [Lucide Icons](https://lucide.dev/) com otimização de renderização por escopo.
+- **Drag & Drop:** [SortableJS](https://sortablejs.github.io/Sortable/) com gerenciamento de instâncias para evitar leaks de memória.
+- **Leitura de Dados (XLSX/CSV):** [SheetJS](https://sheetjs.com/) para importação inteligente de dados externos.
+- **Armazenamento Local:** Uso otimizado de `localStorage` para persistência offline.
 
 ## 📂 Estrutura de Diretórios
 
-O projeto foi organizado de forma escalável e didática:
+O projeto foi organizado de forma escalável e modular:
 
 ```text
 kanbada/
-├── .gitignore                   # Arquivos ignorados pelo Git (dados locais, planilhas sensíveis)
+├── .gitignore                   # Arquivos ignorados pelo Git
 ├── README.md                    # Documentação do projeto
-├── index.html                   # Página principal que contêm os templates e interface global
+├── index.html                   # Página principal e templates UI
 └── src/
     ├── styles/
-    │   └── style.css            # Customizações adicionais e reset padrão
+    │   └── style.css            # Design system, animações e tokens
     ├── components/
-    │   └── Card.js              # Template string que renderiza os cartões individualmente
-    ├── utils/
-    │   └── data_mapper.js       # Tratamento lógico e conversor para dados importados (Ex: Asana -> Kanbada)
-    └── app.js                   # Lógica central da aplicação (Manipulação DOM, LocalStorage, Filtros, CRUD)
+    │   ├── Card.js              # Componente de renderização dos cartões
+    │   ├── Column.js            # Lógica de renderização de colunas
+    │   └── Login.js             # Sistema de autenticação e segurança
+    ├── services/
+    │   └── data_mapper.js       # Tratamento de dados e importadores
+    └── app.js                   # Lógica central e gerenciamento de estado
 ```
 
 ## 🎮 Como Executar (Localmente)
 
-Por ser baseado em Vanilla JavaScript e focado no lado do cliente (`localStorage`), não há necessidade de servidor backend para testes iniciais.
+Por ser baseado em Vanilla JavaScript e focado no cliente, o Kanbada é leve e fácil de rodar:
 
 1. **Clone o repositório:**
    ```bash
    git clone https://github.com/acaciomiranda/kanbada.git
    ```
 
-2. **Entre no diretório do projeto:**
-   ```bash
-   cd kanbada
-   ```
-
-3. **Inicie um servidor local (opcional, mas recomendado devido à política de CORS ao usar módulos JS):**
-   * *Com Node.js (via pacote `serve`):* `npx serve .`
+2. **Inicie um servidor local:**
    * *Com VS Code:* Utilize a extensão **Live Server**.
+   * *Com Node.js:* `npx serve .`
+   * *Com Python:* `python -m http.server`
 
-4. Acesse via `http://localhost:3000` ou no endereço da porta informada.
+3. Acesse via `http://localhost:3000` ou no endereço da porta informada.
 
 ## 🤝 Contribuindo
 
-Se você tiver alguma ideia ou encontrar algum erro, sinta-se à vontade para enviar um Pull Request. Melhorias como sincronização em tempo real (ex: Firebase), upload binário em buckets S3 ou suporte SSR podem ser boas extensões para futuras versões.
+Se você tiver alguma ideia ou encontrar algum erro, sinta-se à vontade para enviar um Pull Request. Melhorias sugeridas:
+- Sincronização em nuvem (Firebase/Supabase).
+- Upload real de arquivos para S3 ou Cloudinary.
+- Temas customizáveis além do Dark Mode.
 
 ---
 Feito com dedicação para gerenciar suas tarefas da melhor forma possível! 🎯

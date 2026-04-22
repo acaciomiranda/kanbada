@@ -14,7 +14,7 @@ let searchTerm = '';
 let deletingId = null;
 let pendingImportTasks = [];
 let viewMode = 'board'; // 'board', 'archive', 'recycle'
-window.selectedTaskIds = []; // IDs das tarefas selecionadas para ações em massa
+let selectedTaskIds = []; // IDs das tarefas selecionadas para ações em massa
 
 let allProjects = ['Redesign App', 'Marketing Q4', 'Lançamento v2'];
 let allColumns = [
@@ -34,16 +34,11 @@ Object.defineProperty(window, 'allProjects', {
     set: (v) => { allProjects = v; },
     configurable: true
 });
-
-const defaultConfig = {
-    background_color: '#12121f',
-    surface_color: '#1e1e36',
-    text_color: '#e0e0ec',
-    board_title: 'Quadro de Tarefas',
-    col_plan: 'Plano',
-    col_progress: 'Em Andamento',
-    col_done: 'Concluído'
-};
+Object.defineProperty(window, 'selectedTaskIds', {
+    get: () => selectedTaskIds,
+    set: (v) => { selectedTaskIds = v; },
+    configurable: true
+});
 
 // --- PERSISTÊNCIA DE DADOS ---
 function saveTasks() {
@@ -461,7 +456,7 @@ window.renderBoard = function(data) {
             </div>
         `).join('');
     }
-    if (window.lucide) window.lucide.createIcons();
+    if (window.lucide) window.lucide.createIcons({ scope: container });
     initSortable();
     updateProjectSelects(); // Mantém os seletores do modal sincronizados com as colunas reais
 
@@ -1267,13 +1262,19 @@ function updateBulkBar() {
 }
 
 // --- START APP ---
+let sortableInstances = [];
+
 function initSortable() {
-    if (viewMode !== 'board') return; // Não inicializa sortable em arquivo/reciclagem
+    if (viewMode !== 'board') return; 
+    
+    // Limpa instâncias anteriores para evitar memory leaks
+    sortableInstances.forEach(inst => inst.destroy());
+    sortableInstances = [];
     
     allColumns.forEach(col => {
         const el = document.getElementById(`col-${col.id}`);
         if (el) {
-            Sortable.create(el, {
+            const inst = Sortable.create(el, {
                 group: 'kanban',
                 animation: 150,
                 ghostClass: 'sortable-ghost',
@@ -1290,8 +1291,6 @@ function initSortable() {
                         saveTasks();
                         window.renderBoard(allTasks);
                         
-                        // Notificar apenas se foi pra concluído (se existir coluna done, mas agora é dinâmico)
-                        // Vamos considerar a última coluna como "concluído"
                         const isLastCol = allColumns[allColumns.length - 1].id === newStatus;
                         if (isLastCol && oldStatus !== newStatus) {
                             addNotification(`✅ Tarefa "${task.title}" finalizada!`);
@@ -1299,6 +1298,7 @@ function initSortable() {
                     }
                 }
             });
+            sortableInstances.push(inst);
         }
     });
 }
