@@ -23,9 +23,17 @@ let allColumns = [
     { id: 'done', title: 'Concluído', color: '#00C9A7' }
 ];
 
-// Exporta para window para acesso externo (ex: Card.js)
-window.allColumns = allColumns;
-window.allProjects = allProjects;
+// Exporta getters ao invés de cópias — Card.js sempre lê o valor atual
+Object.defineProperty(window, 'allColumns', {
+    get: () => allColumns,
+    set: (v) => { allColumns = v; },
+    configurable: true
+});
+Object.defineProperty(window, 'allProjects', {
+    get: () => allProjects,
+    set: (v) => { allProjects = v; },
+    configurable: true
+});
 
 const defaultConfig = {
     background_color: '#12121f',
@@ -75,19 +83,14 @@ function loadNotifications() {
 function saveConfig() {
     localStorage.setItem('kanbada_projects', JSON.stringify(allProjects));
     localStorage.setItem('kanbada_columns', JSON.stringify(allColumns));
-    window.allColumns = allColumns;
-    window.allProjects = allProjects;
 }
 
 function loadConfig() {
     const savedProjects = localStorage.getItem('kanbada_projects');
     const savedColumns = localStorage.getItem('kanbada_columns');
-    
+
     if (savedProjects) allProjects = JSON.parse(savedProjects);
     if (savedColumns) allColumns = JSON.parse(savedColumns);
-    
-    window.allColumns = allColumns;
-    window.allProjects = allProjects;
 }
 
 // --- AUTH ---
@@ -142,20 +145,26 @@ window.logout = function() {
     window.showToast('Você saiu com sucesso.');
 };
 
-// --- IMPORTAÇÃO CSV ---
+// --- IMPORTAÇÃO CSV (usa xlsx para parsing robusto: suporta campos com vírgulas/aspas) ---
 function parseCSV(text) {
-    const lines = text.split('\n').filter(line => line.trim());
-    if (lines.length === 0) return [];
-    
-    const headers = lines[0].split(',').map(h => h.trim().replace(/["']/g, ''));
-    return lines.slice(1).map(line => {
-        const values = line.split(',').map(v => v.trim().replace(/["']/g, ''));
-        let obj = {};
-        headers.forEach((h, i) => {
-            obj[h] = values[i] || '';
+    try {
+        // Usa a lib xlsx já carregada para parsear CSV de forma robusta
+        const workbook = XLSX.read(text, { type: 'string', raw: false });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        return XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    } catch (e) {
+        console.error('Erro ao parsear CSV via xlsx:', e);
+        // Fallback simples (sem suporte a aspas) — apenas para casos extremos
+        const lines = text.split('\n').filter(l => l.trim());
+        if (lines.length === 0) return [];
+        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+        return lines.slice(1).map(line => {
+            const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+            const obj = {};
+            headers.forEach((h, i) => { obj[h] = values[i] || ''; });
+            return obj;
         });
-        return obj;
-    });
+    }
 }
 
 // --- IMPORT ASANA/CSV ROBUSTO ---
@@ -371,9 +380,30 @@ window.renderBoard = function(data) {
         if (addColBtn) addColBtn.classList.remove('hidden');
     } else if (viewMode === 'archive') {
         filtered = data.filter(t => t.archived && !t.deleted);
-        colsToRender = allProjects.map(p => ({ id: 'proj_' + p.replace(/\s+/g, ''), title: p, color: '#9090b0', filterKey: p }));
-        // Adiciona a coluna Geral
-        colsToRender.push({ id: 'proj_Geral', title: 'Geral', color: '#9090b0', filterKey: 'Geral' });
+
+        // Coleta todos os projetos distintos das tarefas arquivadas
+        const archivedProjects = [...new Set(filtered.map(t => t.project || 'Geral'))];
+
+        // Colunas baseadas nos projetos do sidebar + projetos extras das tarefas arquivadas
+        const knownProjects = new Set(['Geral', ...allProjects]);
+        const extraProjects = archivedProjects.filter(p => !knownProjects.has(p));
+
+        colsToRender = [
+            // Projetos registrados no sidebar (sempre exibidos, mesmo que vazios)
+            { id: 'proj_Geral', title: 'Geral', color: '#9090b0', filterKey: 'Geral' },
+            ...allProjects.map((p, i) => {
+                const colors = ['#FF6B8A', '#6C63FF', '#00C9A7', '#FFB84D', '#4DA8FF', '#FF5733', '#C70039'];
+                return { id: 'proj_' + p.replace(/\s+/g, '_'), title: p, color: colors[i % colors.length], filterKey: p };
+            }),
+            // Projetos extras encontrados nas tarefas arquivadas (ex: "Importado")
+            ...extraProjects.map(p => ({
+                id: 'proj_extra_' + p.replace(/\s+/g, '_'),
+                title: p,
+                color: '#6a6a8e',
+                filterKey: p
+            }))
+        ];
+
         if (addColBtn) addColBtn.classList.add('hidden');
         if (boardTitle) boardTitle.textContent = 'Arquivo (Por Projeto)';
     } else if (viewMode === 'recycle') {
@@ -971,7 +1001,7 @@ function renderProjectsSidebar() {
             document.querySelectorAll('.sidebar-item').forEach(s => s.classList.remove('active'));
             viewMode = 'board';
             const bt = document.getElementById('board-title');
-            if (bt) bt.textContent = 'Quadro Kanban';
+            if (bt) bt.textContent = 'Quadro de Tarefas';
 
             const project = e.currentTarget.dataset.project;
             if (currentProjectFilter === project) {
@@ -1099,14 +1129,49 @@ window.bulkSelectAll = function() {
     window.renderBoard(allTasks);
 };
 
-window.bulkSelectStatus = function(columnId) {
-    const statusTasks = getVisibleTasks().filter(t => t.status === columnId);
-    statusTasks.forEach(t => {
-        if (!window.selectedTaskIds.includes(t.__backendId)) {
-            window.selectedTaskIds.push(t.__backendId);
+// Move todas as tarefas selecionadas para uma coluna
+window.bulkMoveToColumn = function(columnId) {
+    if (window.selectedTaskIds.length === 0) return;
+    const col = allColumns.find(c => c.id === columnId);
+    if (!col) return;
+
+    let moved = 0;
+    window.selectedTaskIds.forEach(id => {
+        const task = allTasks.find(t => t.__backendId.toString() === id.toString());
+        if (task && !task.deleted && !task.archived) {
+            task.status = columnId;
+            moved++;
         }
     });
+
+    if (moved === 0) {
+        window.showToast('Nenhuma tarefa ativa foi movida.', 'error');
+        return;
+    }
+
+    window.selectedTaskIds = [];
+    saveTasks();
     window.renderBoard(allTasks);
+    window.showToast(`${moved} tarefa(s) movida(s) para "${col.title}"!`);
+};
+
+// Arquiva todas as tarefas selecionadas em massa
+window.bulkArchive = function() {
+    if (window.selectedTaskIds.length === 0) return;
+
+    let archived = 0;
+    window.selectedTaskIds.forEach(id => {
+        const task = allTasks.find(t => t.__backendId.toString() === id.toString());
+        if (task && !task.deleted && !task.archived) {
+            task.archived = true;
+            archived++;
+        }
+    });
+
+    window.selectedTaskIds = [];
+    saveTasks();
+    window.renderBoard(allTasks);
+    window.showToast(`${archived} tarefa(s) arquivada(s)!`);
 };
 
 window.bulkDelete = function() {
@@ -1162,13 +1227,15 @@ function updateBulkBar() {
 
     if (window.selectedTaskIds.length > 0) {
         bar.classList.remove('hidden');
-        countSpan.textContent = `${window.selectedTaskIds.length} selecionada(s)`;
-        
-        // Atualiza dropdown de status
+        const n = window.selectedTaskIds.length;
+        countSpan.textContent = `${n} selecionada${n > 1 ? 's' : ''}`;
+
+        // Preenche dropdown "Mover para..." com as colunas reais
         if (dropdown) {
-            dropdown.innerHTML = window.allColumns.map(col => `
-                <button onclick="window.bulkSelectStatus('${col.id}')" 
-                    class="w-full text-left px-4 py-2 text-[11px] text-gray-300 hover:bg-white/5 hover:text-[#FF6B8A] transition-colors">
+            dropdown.innerHTML = allColumns.map(col => `
+                <button onclick="window.bulkMoveToColumn('${col.id}')"
+                    class="w-full text-left px-4 py-2 text-[11px] text-gray-300 hover:bg-white/5 hover:text-[#FF6B8A] transition-colors flex items-center gap-2">
+                    <span style="width:6px;height:6px;border-radius:50%;background:${col.color};flex-shrink:0"></span>
                     ${col.title}
                 </button>
             `).join('');
