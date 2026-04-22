@@ -366,13 +366,11 @@ window.renderBoard = function(data) {
     let filtered = [];
     let colsToRender = [];
 
-    const addColBtn = document.getElementById('add-col-btn');
     const boardTitle = document.getElementById('board-title');
 
     if (viewMode === 'board') {
         filtered = data.filter(t => !t.archived && !t.deleted);
         colsToRender = allColumns;
-        if (addColBtn) addColBtn.classList.remove('hidden');
     } else if (viewMode === 'archive') {
         filtered = data.filter(t => t.archived && !t.deleted);
 
@@ -399,12 +397,10 @@ window.renderBoard = function(data) {
             }))
         ];
 
-        if (addColBtn) addColBtn.classList.add('hidden');
         if (boardTitle) boardTitle.textContent = 'Arquivo (Por Projeto)';
     } else if (viewMode === 'recycle') {
         filtered = data.filter(t => t.deleted);
         colsToRender = [{ id: 'lixeira', title: 'Lixeira (Últimos 7 dias)', color: '#FF6B8A' }];
-        if (addColBtn) addColBtn.classList.add('hidden');
         if (boardTitle) boardTitle.textContent = 'Reciclagem';
     }
     
@@ -434,7 +430,7 @@ window.renderBoard = function(data) {
     // Renderiza as colunas e injeta no HTML
     const container = document.getElementById('kanban-board-container');
     if (container) {
-        container.innerHTML = colsToRender.map(col => `
+        let boardHtml = colsToRender.map(col => `
             <div class="flex flex-col" style="width:320px;min-width:300px;flex-shrink:0">
                 <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center gap-2">
@@ -455,6 +451,19 @@ window.renderBoard = function(data) {
                 <div id="col-${col.id}" class="kanban-col flex flex-col gap-3 flex-1 overflow-y-auto pr-1"></div>
             </div>
         `).join('');
+
+        // Adiciona o botão de nova coluna se estiver no modo board
+        if (viewMode === 'board') {
+            boardHtml += `
+                <button onclick="window.promptNewColumn()"
+                    class="flex-shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-[#2a2a44] text-[#9090b0] hover:border-[#FF6B8A] hover:text-[#FF6B8A] transition-colors mt-2 lg:mt-[48px] w-full lg:w-[320px] h-fit">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span class="font-bold text-sm">Adicionar Coluna</span>
+                </button>
+            `;
+        }
+
+        container.innerHTML = boardHtml;
     }
     if (window.lucide) window.lucide.createIcons({ scope: container });
     initSortable();
