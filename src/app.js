@@ -3,15 +3,18 @@
  * Controlador principal do Kanbada.
  */
 
-// Global Error Logging
+// Global Error Logging — console only, never alert() in production
 window.onerror = function(msg, url, line, col, error) {
-    console.error("Global Error Detected:", msg, "at", url, ":", line);
-    alert("Erro detectado: " + msg + "\nVerifique o console (F12) para detalhes.");
-    return false;
+    console.error('[Kanbada] JS Error:', msg, '| file:', url, '| line:', line, '|', error);
+    // Mostra toast discreto apenas para erros conhecidos que afetam o usuário
+    if (window.showToast && typeof msg === 'string' && !msg.includes('Script error')) {
+        window.showToast('Ocorreu um erro inesperado. Recarregue a página se necessário.', 'error');
+    }
+    return true; // true = não propaga para o browser (evita console duplicado)
 };
 
 window.onunhandledrejection = function(event) {
-    console.error("Unhandled Promise Rejection:", event.reason);
+    console.error('[Kanbada] Promise rejection:', event.reason);
 };
 
 // State
@@ -27,6 +30,26 @@ let viewMode = 'board'; // 'board', 'list', 'archive', 'recycle'
 let selectedTaskIds = []; // IDs das tarefas selecionadas para ações em massa
 let currentEditingSubtasks = []; // Subtarefas da tarefa sendo editada no momento
 let editingTaskId = null; // ID da tarefa que está sendo editada
+
+// --- INIT PRINCIPAL ---
+// Usa 'load' (não 'DOMContentLoaded') para garantir que TODOS os scripts
+// — inclusive Login.js, Card.js, Column.js — foram totalmente executados
+// antes de iniciar a autenticação e renderização do board.
+window.addEventListener('load', function() {
+    console.log('[Kanbada] window.load — todos os scripts prontos. Iniciando checkAuth...');
+    if (typeof checkAuth === 'function') {
+        checkAuth();
+    } else {
+        console.error('[Kanbada] checkAuth não definida. Verifique a ordem dos scripts.');
+    }
+
+    document.getElementById('search-input')?.addEventListener('input', (e) => {
+        searchTerm = e.target.value;
+        window.renderBoard(allTasks);
+    });
+
+    initSidebarListeners();
+});
 
 
 
@@ -348,13 +371,24 @@ async function showApp() {
 
     // Carregar dados na ordem correta
     await loadConfig();
+
+    // Garante que currentUser.name e currentUser.initials existem para updateAvatars()
+    if (!currentUser.name) {
+        currentUser.name = currentUser.displayName || currentUser.email?.split('@')[0] || 'Usuário';
+    }
+    if (!currentUser.initials) {
+        currentUser.initials = currentUser.name
+            .split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+    }
+
     updateAvatars();
     renderProjectsSidebar();
     updateProjectSelects();
     await loadTasks();
     loadNotifications();
 
-    window.showToast(`Sessão ativa: ${currentUser.name}`);
+    const nome = currentUser.name || 'Usuário';
+    window.showToast(`Bem-vindo, ${nome}!`);
 }
 
 function hideApp() {
@@ -605,17 +639,28 @@ window.exportTasks = function () {
     window.showToast('Backup exportado com sucesso!');
 };
 
-function cleanupRecycleBin() {
+async function cleanupRecycleBin() {
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const initialLen = allTasks.length;
-    allTasks = allTasks.filter(t => {
+    const toDelete = allTasks.filter(t => {
         if (t.deleted && t.deletedAt) {
-            const delDate = new Date(t.deletedAt).getTime();
-            return delDate > sevenDaysAgo;
+            return new Date(t.deletedAt).getTime() <= sevenDaysAgo;
         }
-        return true;
+        return false;
     });
-    if (allTasks.length !== initialLen) saveTasks();
+
+    if (toDelete.length === 0) return;
+
+    // Remove do array local
+    allTasks = allTasks.filter(t => !toDelete.includes(t));
+
+    // Remove do Firestore em background (não bloqueia o render)
+    if (currentUser) {
+        toDelete.forEach(t => {
+            dbService.deleteTask(currentUser.uid, t.__backendId).catch(e =>
+                console.error('[Kanbada] Erro ao limpar lixeira:', e)
+            );
+        });
+    }
 }
 
 // --- RENDER & FILTERS ---
@@ -650,8 +695,8 @@ function getVisibleTasks(data = allTasks) {
     return filtered;
 }
 
-window.renderBoard = function (data) {
-    cleanupRecycleBin();
+window.renderBoard = async function (data) {
+    await cleanupRecycleBin();
     const boardTitle = document.getElementById('board-title');
     const filtered = getVisibleTasks(data);
 
@@ -752,10 +797,16 @@ window.renderBoard = function (data) {
     updateBulkBar();
 };
 
+let _sortableInstances = [];
+
 function initSortable() {
+    // Destrói instâncias anteriores para evitar listeners duplicados
+    _sortableInstances.forEach(inst => { try { inst.destroy(); } catch(e) {} });
+    _sortableInstances = [];
+
     const cols = document.querySelectorAll('.kanban-col');
     cols.forEach(col => {
-        new Sortable(col, {
+        const inst = new Sortable(col, {
             group: 'tasks',
             animation: 150,
             ghostClass: 'opacity-50',
@@ -772,6 +823,7 @@ function initSortable() {
                 }
             }
         });
+        _sortableInstances.push(inst);
     });
 }
 
@@ -841,7 +893,7 @@ function renderListView(tasks) {
                                 ${t.due_date ? new Date(t.due_date).toLocaleDateString('pt-BR') : '-'}
                             </td>
                             <td class="px-6 py-4 text-right">
-                                <button onclick="window.openModal('${t.status}', '${t.id}')" class="p-2 text-gray-500 hover:text-white transition-colors">
+                                <button onclick="window.openModal('${t.status}', '${t.__backendId}')" class="p-2 text-gray-500 hover:text-white transition-colors">
                                     <i data-lucide="edit-2" class="w-4 h-4"></i>
                                 </button>
                             </td>
@@ -1283,7 +1335,7 @@ window.promptEditColumn = async function(id) {
 window.promptDeleteColumn = async function(id) {
     const hasTasks = allTasks.some(t => t.status === id && !t.deleted);
     if (hasTasks) {
-        alert('Não é possível excluir uma coluna que contém tarefas ativas.');
+        window.showToast('Não é possível excluir uma coluna com tarefas ativas.', 'error');
         return;
     }
     const confirm = await window.customConfirm('Excluir Coluna', 'Deseja realmente excluir esta coluna?', true);
@@ -1293,18 +1345,7 @@ window.promptDeleteColumn = async function(id) {
     window.renderBoard(allTasks);
 };
 
-// --- INIT ---
-document.addEventListener('DOMContentLoaded', () => {
-    console.log("DOMContentLoaded fired. Starting checkAuth...");
-    checkAuth();
-
-    document.getElementById('search-input')?.addEventListener('input', (e) => {
-        searchTerm = e.target.value;
-        window.renderBoard(allTasks);
-    });
-    
-    initSidebarListeners();
-});
+// --- FIM DO app.js ---
 
 function updateProjectSelects() {
     const selects = document.querySelectorAll('#f-project');
