@@ -265,7 +265,7 @@ button:hover,
     
     /* Kanban Board Mobile */
     .kanban-board {
-        flex-direction: column !important;
+        flex-direction: column;
         gap: 20px;
     }
     
