@@ -74,7 +74,14 @@ function setupLoginListeners() {
             const user = await authService.login(email, pass);
             if (window.onLoginSuccess) window.onLoginSuccess(user);
         } catch (err) {
-            errDiv.textContent = 'E-mail ou senha incorretos.';
+            console.error("Login Error:", err);
+            if (err.code === 'auth/invalid-credential') {
+                errDiv.textContent = 'E-mail ou senha incorretos.';
+            } else if (err.code === 'auth/too-many-requests') {
+                errDiv.textContent = 'Muitas tentativas. Tente mais tarde.';
+            } else {
+                errDiv.textContent = 'Erro de autenticação: ' + (err.message || 'Verifique sua conexão');
+            }
             errDiv.classList.remove('hidden');
         }
     };
@@ -162,7 +169,18 @@ function renderRegister() {
             });
             if (window.onLoginSuccess) window.onLoginSuccess(user);
         } catch (err) {
-            errDiv.textContent = 'Erro ao criar conta. E-mail já em uso?';
+            console.error("Register Error:", err);
+            if (err.code === 'auth/email-already-in-use') {
+                errDiv.textContent = 'Este e-mail já está em uso.';
+            } else if (err.code === 'auth/weak-password') {
+                errDiv.textContent = 'A senha deve ter pelo menos 6 caracteres.';
+            } else if (err.code === 'auth/operation-not-allowed') {
+                errDiv.textContent = 'Login por e-mail não habilitado no Firebase.';
+            } else if (err.code === 'auth/unauthorized-domain') {
+                errDiv.textContent = 'Este domínio não está autorizado no Firebase.';
+            } else {
+                errDiv.textContent = 'Erro ao criar conta: ' + (err.message || 'Tente novamente');
+            }
             errDiv.classList.remove('hidden');
         }
     };
