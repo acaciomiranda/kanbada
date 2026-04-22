@@ -22,6 +22,10 @@ let allColumns = [
     { id: 'done', title: 'Concluído', color: '#00C9A7' }
 ];
 
+// Exporta para window para acesso externo (ex: Card.js)
+window.allColumns = allColumns;
+window.allProjects = allProjects;
+
 const defaultConfig = {
     background_color: '#12121f',
     surface_color: '#1e1e36',
@@ -70,6 +74,8 @@ function loadNotifications() {
 function saveConfig() {
     localStorage.setItem('kanbada_projects', JSON.stringify(allProjects));
     localStorage.setItem('kanbada_columns', JSON.stringify(allColumns));
+    window.allColumns = allColumns;
+    window.allProjects = allProjects;
 }
 
 function loadConfig() {
@@ -78,6 +84,9 @@ function loadConfig() {
     
     if (savedProjects) allProjects = JSON.parse(savedProjects);
     if (savedColumns) allColumns = JSON.parse(savedColumns);
+    
+    window.allColumns = allColumns;
+    window.allProjects = allProjects;
 }
 
 // --- AUTH ---
@@ -423,6 +432,7 @@ window.renderBoard = function(data) {
     }
     if (window.lucide) window.lucide.createIcons();
     initSortable();
+    updateProjectSelects(); // Mantém os seletores do modal sincronizados com as colunas reais
 
     // Preenche as colunas com os cartões
     colsToRender.forEach(col => {
@@ -975,9 +985,13 @@ function renderProjectsSidebar() {
 }
 
 function updateProjectSelects() {
-    const selects = document.querySelectorAll('select#f-project');
-    const optionsHtml = `<option value="Geral">Geral</option>` + allProjects.map(p => `<option value="${p}">${p}</option>`).join('');
-    selects.forEach(s => s.innerHTML = optionsHtml);
+    const projSelects = document.querySelectorAll('select#f-project');
+    const projOptionsHtml = `<option value="Geral">Geral</option>` + allProjects.map(p => `<option value="${p}">${p}</option>`).join('');
+    projSelects.forEach(s => s.innerHTML = projOptionsHtml);
+
+    const statusSelects = document.querySelectorAll('select#f-status');
+    const statusOptionsHtml = allColumns.map(col => `<option value="${col.id}">${col.title}</option>`).join('');
+    statusSelects.forEach(s => s.innerHTML = statusOptionsHtml);
 }
 
 window.promptEditColumn = function(id) {
