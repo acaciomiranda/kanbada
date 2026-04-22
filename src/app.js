@@ -745,6 +745,16 @@ function updateNotificationUI() {
     ).join('');
 }
 
+window.clearNotifications = function() {
+    if (notifications.length === 0) return;
+    if (confirm('Deseja limpar todas as notificações?')) {
+        notifications = [];
+        updateNotificationUI();
+        saveNotifications();
+        window.showToast('Notificações limpas');
+    }
+};
+
 function initNotificationListeners() {
     document.getElementById('noti-bell')?.addEventListener('click', (e) => {
         e.stopPropagation();

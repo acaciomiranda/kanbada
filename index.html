@@ -184,8 +184,9 @@
                         <!-- Dropdown Notificações -->
                         <div id="notification-dropdown"
                             class="absolute right-0 mt-2 w-64 bg-[#1e1e36] rounded-xl overflow-hidden hidden z-50">
-                            <div class="p-3 border-b border-[#2a2a44] bg-[#2a2a44]/30">
+                            <div class="p-3 border-b border-[#2a2a44] bg-[#2a2a44]/30 flex items-center justify-between">
                                 <h4 class="text-xs font-bold text-white">Notificações</h4>
+                                <button onclick="window.clearNotifications()" class="text-[10px] font-bold text-[#FF6B8A] hover:text-pink-400 transition-colors">Limpar</button>
                             </div>
                             <div id="noti-list" class="max-h-64 overflow-y-auto"></div>
                         </div>
