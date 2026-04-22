@@ -752,14 +752,14 @@ window.closeReportsModal = function () {
 
 // --- APP INIT & LISTENERS ---
 function initSidebarListeners() {
-    document.getElementById('nav-home').addEventListener('click', () => {
+    document.getElementById('nav-home')?.addEventListener('click', () => {
         viewMode = 'board';
         const bt = document.getElementById('board-title');
         if (bt) bt.textContent = 'Quadro de Tarefas';
         window.clearFilters();
     });
 
-    document.getElementById('nav-my-tasks').addEventListener('click', (e) => {
+    document.getElementById('nav-my-tasks')?.addEventListener('click', (e) => {
         viewMode = 'board';
         const bt = document.getElementById('board-title');
         if (bt) bt.textContent = 'Quadro de Tarefas';
@@ -770,7 +770,7 @@ function initSidebarListeners() {
         window.renderBoard(allTasks);
     });
 
-    document.getElementById('nav-reports').addEventListener('click', (e) => {
+    document.getElementById('nav-reports')?.addEventListener('click', (e) => {
         document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
         e.currentTarget.classList.add('active');
         window.showReports();
@@ -795,6 +795,85 @@ function initSidebarListeners() {
         if (window.innerWidth < 1024) window.closeSidebar();
     });
 }
+
+// --- GLOBAL ACTIONS FOR INDEX.HTML ---
+window.setView = function(mode) {
+    viewMode = mode;
+    currentProjectFilter = null;
+    showOnlyMyTasks = false;
+    
+    // Atualiza classes ativas na sidebar
+    document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+    const navItem = document.getElementById('nav-' + mode);
+    if (navItem) navItem.classList.add('active');
+
+    window.renderBoard(allTasks);
+    if (window.innerWidth < 1024) window.closeSidebar();
+};
+
+window.openReports = function() {
+    window.showReports();
+};
+
+window.filterByProject = function(projectName) {
+    currentProjectFilter = projectName;
+    viewMode = 'board';
+    window.renderBoard(allTasks);
+};
+
+window.promptNewProject = async function() {
+    const name = await window.customPrompt('Novo Projeto', 'Digite o nome do projeto:');
+    if (!name) return;
+    const colors = ['#FF6B8A', '#6C63FF', '#00C9A7', '#FFB84D', '#4DA8FF'];
+    const color = colors[allProjects.length % colors.length];
+    allProjects.push({ name, color });
+    saveConfig();
+    renderProjectsSidebar();
+    window.showToast(`Projeto "${name}" criado!`);
+};
+
+window.openSidebar = () => {
+    document.getElementById('sidebar')?.classList.remove('-translate-x-full');
+    document.getElementById('sidebar-overlay')?.classList.remove('hidden');
+};
+
+window.closeSidebar = () => {
+    document.getElementById('sidebar')?.classList.add('-translate-x-full');
+    document.getElementById('sidebar-overlay')?.classList.add('hidden');
+};
+
+// --- COLUNAS ---
+window.promptNewColumn = async function() {
+    const title = await window.customPrompt('Nova Coluna', 'Título da coluna:');
+    if (!title) return;
+    const id = 'col_' + Date.now();
+    allColumns.push({ id, title, color: '#FF6B8A' });
+    saveConfig();
+    window.renderBoard(allTasks);
+};
+
+window.promptEditColumn = async function(id) {
+    const col = allColumns.find(c => c.id === id);
+    if (!col) return;
+    const newTitle = await window.customPrompt('Editar Coluna', 'Novo título:', col.title);
+    if (!newTitle) return;
+    col.title = newTitle;
+    saveConfig();
+    window.renderBoard(allTasks);
+};
+
+window.promptDeleteColumn = async function(id) {
+    const hasTasks = allTasks.some(t => t.status === id && !t.deleted);
+    if (hasTasks) {
+        alert('Não é possível excluir uma coluna que contém tarefas ativas.');
+        return;
+    }
+    const confirm = await window.customConfirm('Excluir Coluna', 'Deseja realmente excluir esta coluna?', true);
+    if (!confirm) return;
+    allColumns = allColumns.filter(c => c.id !== id);
+    saveConfig();
+    window.renderBoard(allTasks);
+};
 
 // --- INIT ---
 document.addEventListener('DOMContentLoaded', () => {
