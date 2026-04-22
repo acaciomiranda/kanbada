@@ -102,12 +102,21 @@
             </div>
         </aside>
 
+        <!-- Overlay sidebar mobile -->
+        <div id="sidebar-overlay" class="sidebar-overlay" onclick="window.closeSidebar()"></div>
+
         <!-- Main Content -->
         <div class="flex-1 flex flex-col h-full overflow-hidden">
             <!-- Header -->
             <header class="flex items-center justify-between px-6 py-3 flex-shrink-0"
                 style="border-bottom:1px solid #2a2a44;background:#16162a">
                 <div class="flex items-center gap-3">
+                    <!-- Hamburguer mobile -->
+                    <button id="sidebar-toggle" onclick="window.toggleSidebar()"
+                        class="lg:hidden p-2 rounded-lg hover:bg-white/5 transition-colors flex-shrink-0"
+                        style="color:#9090b0" title="Menu">
+                        <i data-lucide="menu" style="width:20px;height:20px"></i>
+                    </button>
                     <h1 id="board-title" class="font-bold text-lg" style="color:#fff">Quadro de Tarefas</h1>
 
                     <!-- Botões de Importação -->
@@ -125,12 +134,20 @@
                         <i data-lucide="link" class="w-3.5 h-3.5"></i> Google Sheets
                     </button>
 
-                    <button onclick="window.exportTasks()"
-                        class="px-3 py-1.5 rounded-lg flex items-center gap-2 text-[11px] font-bold transition-all active:scale-95"
-                        style="background:rgba(0,201,167,0.1); border:1px solid rgba(0,201,167,0.2); color:#00C9A7"
-                        title="Exportar backup das tarefas (Ctrl+E)">
-                        <i data-lucide="download" class="w-3.5 h-3.5"></i> Exportar
-                    </button>
+                    <div class="flex items-center gap-1" id="export-group">
+                        <button onclick="window.exportTasks()"
+                            class="px-3 py-1.5 rounded-lg flex items-center gap-2 text-[11px] font-bold transition-all active:scale-95"
+                            style="background:rgba(0,201,167,0.1); border:1px solid rgba(0,201,167,0.2); color:#00C9A7"
+                            title="Exportar backup JSON (Ctrl+E)">
+                            <i data-lucide="download" class="w-3.5 h-3.5"></i> JSON
+                        </button>
+                        <button onclick="window.exportTasksCSV()"
+                            class="px-3 py-1.5 rounded-lg flex items-center gap-2 text-[11px] font-bold transition-all active:scale-95"
+                            style="background:rgba(0,201,167,0.1); border:1px solid rgba(0,201,167,0.2); color:#00C9A7"
+                            title="Exportar tarefas em CSV (compatível Asana)">
+                            <i data-lucide="table" class="w-3.5 h-3.5"></i> CSV
+                        </button>
+                    </div>
 
                     <input type="file" id="asana-import-input" accept=".xlsx,.xls,.csv" class="hidden"
                         onchange="window.handleAsanaImport(event)">
@@ -190,6 +207,14 @@
                     <span class="font-bold text-sm">Adicionar Coluna</span>
                 </button>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal: Relatórios -->
+    <div id="reports-modal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div id="reports-content" style="background:#1e1e36;border:1px solid #2a2a44;border-radius:16px;width:700px;max-width:95%;max-height:90vh;overflow-y:auto"
+            class="p-6">
+            <!-- Preenchido dinamicamente pelo JS -->
         </div>
     </div>
 

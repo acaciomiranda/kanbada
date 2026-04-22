@@ -5,13 +5,15 @@
 ## 🚀 Principais Funcionalidades
 
 - **Gerenciamento Dinâmico:** Crie, edite e organize projetos e colunas conforme sua metodologia de trabalho.
+- **Relatórios Avançados:** Dashboard visual com KPIs (total, concluídas, taxa de conclusão, atrasadas), progresso por coluna, por projeto e ranking de responsáveis.
 - **Cartões Detalhados:** Adicione prazo, etiquetas (tags) com cores customizáveis, responsáveis e descrições profundas.
 - **Gestão de Status Dinâmica:** Arraste e solte cartões (Drag & Drop) entre colunas ou altere rapidamente o status diretamente pelo seletor dentro da tarefa.
 - **Interatividade Total:** Edição com apenas um clique sobre o card, com acesso imediato a arquivos anexados (suporte indicativo de até 1GB).
 - **Sistema de Reações:** Deixe curtidas (👍) ou amei (❤️) para facilitar a comunicação e priorização.
 - **Espaço Seguro:** Tarefas concluídas podem ser **Arquivadas** por projeto. Tarefas apagadas vão para a **Reciclagem (Lixeira)** e ficam aguardando por 7 dias, podendo ser restauradas ou excluídas permanentemente.
-- **Organização Centralizada:** O projeto padrão "Geral" unifica as tarefas que não possuem hierarquia definida, facilitando o gerenciamento global.
-- **Backup e Exportação:** Exporte as tarefas e as importe via JSON, garantindo a integridade dos seus dados. O suporte à importação CSV via Google Sheets facilita a transição a partir do Asana.
+- **Experiência Mobile:** Menu lateral responsivo com overlay e suporte a gestos de clique para fechar a navegação.
+- **Backup e Exportação:** Exporte backups em JSON ou gere planilhas CSV compatíveis com o Asana.
+- **Autenticação Multi-usuário:** Sistema de login e cadastro seguro com hash SHA-256 local e suporte para múltiplas contas no mesmo navegador.
 
 ## 🛠️ Tecnologias e Dependências
 

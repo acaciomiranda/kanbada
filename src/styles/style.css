@@ -440,3 +440,94 @@ textarea:focus,
 select:focus {
     transition: border-color 0.2s ease;
 }
+
+/* ===== SIDEBAR MOBILE MELHORADA ===== */
+@media (max-width: 1023px) {
+    #sidebar {
+        position: fixed;
+        left: -260px;
+        top: 0;
+        bottom: 0;
+        width: 240px;
+        transition: left 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 1001;
+        box-shadow: none;
+    }
+
+    #sidebar.open {
+        left: 0;
+        box-shadow: 4px 0 24px rgba(0, 0, 0, 0.6);
+    }
+
+    /* Hamburguer só visível em mobile */
+    #sidebar-toggle {
+        display: flex;
+    }
+
+    /* Overlay escurece o conteúdo */
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        z-index: 1000;
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+    }
+
+    .sidebar-overlay.active {
+        display: block;
+        animation: fadeOverlay 0.2s ease-out;
+    }
+
+    @keyframes fadeOverlay {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+    }
+}
+
+/* Hamburguer oculto em desktop */
+@media (min-width: 1024px) {
+    #sidebar-toggle {
+        display: none;
+    }
+    #sidebar-overlay {
+        display: none !important;
+    }
+    #sidebar {
+        position: relative;
+        left: 0 !important;
+    }
+}
+
+/* ===== HEADER MOBILE: esconde botões de importação em telas pequenas ===== */
+@media (max-width: 640px) {
+    #export-group,
+    button[onclick="window.triggerImport()"],
+    button[onclick="window.importGoogleSheets()"] {
+        display: none;
+    }
+}
+
+/* ===== RELATÓRIOS MODAL RESPONSIVO ===== */
+#reports-content .grid {
+    /* Em mobile, 2 colunas viram 1 */
+}
+
+@media (max-width: 640px) {
+    #reports-content [style*="grid-template-columns:repeat(4,1fr)"] {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+    #reports-content [style*="grid-template-columns:1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* ===== TOAST COLORIDO POR TIPO ===== */
+#toast {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+#toast.toast-success { background: #1a3a2e; border: 1px solid #00C9A7; color: #00C9A7; }
+#toast.toast-error   { background: #3a1a1a; border: 1px solid #FF6B8A; color: #FF6B8A; }
+#toast.toast-default { background: #2a2a44; border: 1px solid #3f3f5a; color: #e0e0ec; }

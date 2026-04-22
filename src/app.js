@@ -36,7 +36,6 @@ const defaultConfig = {
 function saveTasks() {
     try {
         localStorage.setItem('kanbada_tasks', JSON.stringify(allTasks));
-        console.log('✅ Tarefas salvas:', allTasks.length);
     } catch (e) {
         console.error('Erro ao salvar tarefas:', e);
         window.showToast('Erro ao salvar. Espaço insuficiente?', 'error');
@@ -48,13 +47,12 @@ function loadTasks() {
         const saved = localStorage.getItem('kanbada_tasks');
         if (saved) {
             allTasks = JSON.parse(saved);
-            console.log('✅ Tarefas carregadas:', allTasks.length);
-            window.renderBoard(allTasks);
         }
     } catch (e) {
         console.error('Erro ao carregar tarefas:', e);
         allTasks = [];
     }
+    window.renderBoard(allTasks); // Sempre renderiza (mesmo quadro vazio)
 }
 
 function saveNotifications() {
@@ -100,8 +98,7 @@ function showApp() {
     loadConfig();
     renderProjectsSidebar();
     updateProjectSelects();
-    window.renderBoard(allTasks);
-    loadTasks();
+    loadTasks();        // renderBoard é chamado dentro de loadTasks quando há dados
     loadNotifications();
     window.showToast(`Bem-vindo, ${currentUser.name}!`);
 }
@@ -195,7 +192,6 @@ window.handleAsanaImport = function(e) {
 
                 // Detecção de cabeçalho
                 const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-                console.log("Primeiras linhas:", rows.slice(0, 3));
 
                 let headerIndex = 0;
                 const keywords = ['name', 'nome', 'task', 'tarefa', 'projeto', 'project'];
@@ -213,7 +209,6 @@ window.handleAsanaImport = function(e) {
                     }
                 }
 
-                console.log("Cabeçalho na linha:", headerIndex + 1);
                 const rawData = XLSX.utils.sheet_to_json(sheet, { range: headerIndex });
                 
                 if (!window.dataMapper) throw new Error('Data Mapper não carregado.');
@@ -460,33 +455,171 @@ window.clearFilters = function() {
 
 // --- RELATÓRIOS ---
 window.showReports = function() {
-    const stats = {
-        total: allTasks.length,
-        completed: allTasks.filter(t => t.status === 'done').length,
-        inProgress: allTasks.filter(t => t.status === 'progress').length,
-        pending: allTasks.filter(t => t.status === 'plan').length
-    };
-    
-    const completionRate = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
-    
-    const projects = {};
-    allTasks.forEach(t => {
-        if (!projects[t.project]) projects[t.project] = 0;
-        projects[t.project]++;
+    const activeTasks = allTasks.filter(t => !t.deleted && !t.archived);
+    const total = activeTasks.length;
+
+    // Contagens por coluna (dinâmico)
+    const byCols = allColumns.map(col => ({
+        id: col.id,
+        title: col.title,
+        color: col.color,
+        count: activeTasks.filter(t => t.status === col.id).length
+    }));
+
+    // Última coluna = "concluído" para taxa de conclusão
+    const lastCol = allColumns[allColumns.length - 1];
+    const doneCount = lastCol ? activeTasks.filter(t => t.status === lastCol.id).length : 0;
+    const completionRate = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+
+    // Tarefas atrasadas
+    const today = new Date(); today.setHours(0,0,0,0);
+    const overdue = activeTasks.filter(t => {
+        if (!t.due_date || t.status === lastCol?.id) return false;
+        const d = new Date(t.due_date); d.setHours(0,0,0,0);
+        return d < today;
+    }).length;
+
+    // Por projeto
+    const byProject = {};
+    activeTasks.forEach(t => {
+        const p = t.project || 'Geral';
+        if (!byProject[p]) byProject[p] = { total: 0, done: 0 };
+        byProject[p].total++;
+        if (lastCol && t.status === lastCol.id) byProject[p].done++;
     });
-    
-    const projectList = Object.entries(projects)
-        .map(([name, count]) => `${name}: ${count}`)
-        .join(' | ');
-    
-    window.showToast(
-        `📊 Total: ${stats.total} | ✅ Concluídas: ${stats.completed} (${completionRate}%) | 🔄 Em andamento: ${stats.inProgress} | 📝 Pendentes: ${stats.pending}`,
-        'default'
-    );
-    
-    setTimeout(() => {
-        window.showToast(`📁 Por projeto: ${projectList}`, 'default');
-    }, 3500);
+
+    // Por responsável
+    const byAssignee = {};
+    activeTasks.forEach(t => {
+        const a = t.assignee || 'Sem responsável';
+        if (!byAssignee[a]) byAssignee[a] = 0;
+        byAssignee[a]++;
+    });
+    const topAssignees = Object.entries(byAssignee).sort((a,b) => b[1]-a[1]).slice(0,5);
+
+    // Tarefas sem data de entrega
+    const noDate = activeTasks.filter(t => !t.due_date).length;
+
+    // Render
+    const modal = document.getElementById('reports-modal');
+    const content = document.getElementById('reports-content');
+    if (!modal || !content) return;
+
+    const colBars = byCols.map(col => {
+        const pct = total > 0 ? Math.round((col.count / total) * 100) : 0;
+        return `
+        <div>
+            <div class="flex items-center justify-between mb-1">
+                <div class="flex items-center gap-2">
+                    <span style="width:8px;height:8px;border-radius:50%;background:${col.color};flex-shrink:0"></span>
+                    <span class="text-xs text-gray-300 truncate" style="max-width:120px">${col.title}</span>
+                </div>
+                <span class="text-xs font-bold" style="color:${col.color}">${col.count}</span>
+            </div>
+            <div class="rounded-full overflow-hidden" style="height:6px;background:#2a2a44">
+                <div class="h-full rounded-full transition-all" style="width:${pct}%;background:${col.color}"></div>
+            </div>
+        </div>`;
+    }).join('');
+
+    const projectRows = Object.entries(byProject).sort((a,b) => b[1].total-a[1].total).map(([name, data]) => {
+        const pct = data.total > 0 ? Math.round((data.done / data.total) * 100) : 0;
+        return `
+        <div class="flex items-center justify-between py-2" style="border-bottom:1px solid #2a2a44">
+            <span class="text-xs text-gray-300 truncate flex-1 mr-4">${name}</span>
+            <div class="flex items-center gap-3">
+                <div class="rounded-full overflow-hidden" style="width:80px;height:4px;background:#2a2a44">
+                    <div class="h-full rounded-full" style="width:${pct}%;background:#00C9A7"></div>
+                </div>
+                <span class="text-xs font-mono" style="color:#9090b0;min-width:40px;text-align:right">${data.done}/${data.total}</span>
+                <span class="text-xs font-bold" style="color:${pct===100?'#00C9A7':'#9090b0'};min-width:36px;text-align:right">${pct}%</span>
+            </div>
+        </div>`;
+    }).join('');
+
+    const assigneeRows = topAssignees.map(([name, count]) => `
+        <div class="flex items-center gap-2 py-1.5">
+            <div class="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0"
+                style="background:linear-gradient(135deg,#FF6B8A,#c850c0)">
+                ${name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase()}
+            </div>
+            <span class="text-xs text-gray-300 truncate flex-1">${name}</span>
+            <span class="text-xs font-bold px-2 py-0.5 rounded-full" style="background:#2a2a44;color:#9090b0">${count}</span>
+        </div>`).join('');
+
+    content.innerHTML = `
+        <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center gap-3">
+                <div class="p-2 rounded-xl" style="background:rgba(108,99,255,0.15)">
+                    <i data-lucide="bar-chart-2" style="width:20px;height:20px;color:#6C63FF"></i>
+                </div>
+                <div>
+                    <h2 class="font-bold text-base text-white">Relatórios</h2>
+                    <p class="text-xs" style="color:#9090b0">Visão geral do quadro</p>
+                </div>
+            </div>
+            <button onclick="document.getElementById('reports-modal').classList.add('hidden')"
+                style="color:#9090b0" title="Fechar">
+                <i data-lucide="x" style="width:20px;height:20px"></i>
+            </button>
+        </div>
+
+        <!-- KPIs -->
+        <div class="grid grid-cols-2 gap-3 mb-6" style="grid-template-columns:repeat(4,1fr)">
+            <div class="p-4 rounded-xl" style="background:#12121f;border:1px solid #2a2a44">
+                <p class="text-[10px] uppercase tracking-wider mb-1" style="color:#6a6a8e">Total</p>
+                <p class="text-2xl font-bold text-white">${total}</p>
+            </div>
+            <div class="p-4 rounded-xl" style="background:#12121f;border:1px solid #2a2a44">
+                <p class="text-[10px] uppercase tracking-wider mb-1" style="color:#6a6a8e">Concluídas</p>
+                <p class="text-2xl font-bold" style="color:#00C9A7">${doneCount}</p>
+            </div>
+            <div class="p-4 rounded-xl" style="background:#12121f;border:1px solid #2a2a44">
+                <p class="text-[10px] uppercase tracking-wider mb-1" style="color:#6a6a8e">Taxa de Conclusão</p>
+                <p class="text-2xl font-bold" style="color:${completionRate>=75?'#00C9A7':completionRate>=40?'#FFB84D':'#FF6B8A'}">${completionRate}%</p>
+            </div>
+            <div class="p-4 rounded-xl" style="background:#12121f;border:1px solid #2a2a44">
+                <p class="text-[10px] uppercase tracking-wider mb-1" style="color:#6a6a8e">Atrasadas</p>
+                <p class="text-2xl font-bold" style="color:${overdue>0?'#FF6B8A':'#9090b0'}">${overdue}</p>
+            </div>
+        </div>
+
+        <div class="grid gap-5" style="grid-template-columns:1fr 1fr">
+            <!-- Distribuição por Coluna -->
+            <div class="p-4 rounded-xl" style="background:#12121f;border:1px solid #2a2a44">
+                <h3 class="text-xs font-bold text-white mb-4 uppercase tracking-wider">Distribuição por Coluna</h3>
+                ${total === 0 ? '<p class="text-xs text-gray-500 italic text-center py-4">Nenhuma tarefa ainda</p>' : `<div class="space-y-3">${colBars}</div>`}
+            </div>
+
+            <!-- Responsáveis -->
+            <div class="p-4 rounded-xl" style="background:#12121f;border:1px solid #2a2a44">
+                <h3 class="text-xs font-bold text-white mb-4 uppercase tracking-wider">Top Responsáveis</h3>
+                ${topAssignees.length === 0 ? '<p class="text-xs text-gray-500 italic text-center py-4">Nenhum responsável atribuído</p>' : assigneeRows}
+            </div>
+        </div>
+
+        <!-- Por Projeto -->
+        <div class="mt-5 p-4 rounded-xl" style="background:#12121f;border:1px solid #2a2a44">
+            <h3 class="text-xs font-bold text-white mb-2 uppercase tracking-wider">Progresso por Projeto</h3>
+            ${Object.keys(byProject).length === 0
+                ? '<p class="text-xs text-gray-500 italic text-center py-4">Nenhuma tarefa com projeto</p>'
+                : projectRows}
+        </div>
+
+        <!-- Info adicional -->
+        <div class="mt-4 flex gap-4 text-[10px]" style="color:#6a6a8e">
+            <span>📁 Arquivadas: ${allTasks.filter(t=>t.archived&&!t.deleted).length}</span>
+            <span>🗑️ Na lixeira: ${allTasks.filter(t=>t.deleted).length}</span>
+            <span>📅 Sem prazo: ${noDate}</span>
+        </div>
+    `;
+
+    modal.classList.remove('hidden');
+    if (window.lucide) window.lucide.createIcons({ scope: content });
+};
+
+window.closeReportsModal = function() {
+    document.getElementById('reports-modal').classList.add('hidden');
 };
 
 // --- APP INIT & LISTENERS ---
@@ -513,6 +646,7 @@ function initSidebarListeners() {
         document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
         e.currentTarget.classList.add('active');
         window.showReports();
+        if (window.innerWidth < 1024) window.closeSidebar();
     });
 
     document.getElementById('nav-archive')?.addEventListener('click', (e) => {
@@ -521,6 +655,7 @@ function initSidebarListeners() {
         e.currentTarget.classList.add('active');
         currentProjectFilter = null;
         window.renderBoard(allTasks);
+        if (window.innerWidth < 1024) window.closeSidebar();
     });
     
     document.getElementById('nav-recycle')?.addEventListener('click', (e) => {
@@ -529,6 +664,7 @@ function initSidebarListeners() {
         e.currentTarget.classList.add('active');
         currentProjectFilter = null;
         window.renderBoard(allTasks);
+        if (window.innerWidth < 1024) window.closeSidebar();
     });
 }
 
@@ -936,12 +1072,15 @@ function initSortable() {
 window.showToast = function(msg, type = 'default') {
     const t = document.getElementById('toast');
     if (!t) return;
-    
     t.textContent = msg;
-    t.style.background = type === 'error' ? '#FF6B8A' : '#2a2a44';
-    t.classList.remove('hidden');
-    
-    setTimeout(() => t.classList.add('hidden'), 3500);
+    // Remove classes anteriores
+    t.classList.remove('toast-success', 'toast-error', 'toast-default', 'hidden');
+    t.classList.add('toast-' + type);
+    // Limpa style inline legado
+    t.style.background = '';
+
+    clearTimeout(t._toastTimer);
+    t._toastTimer = setTimeout(() => t.classList.add('hidden'), 3500);
 };
 
 // --- ATALHOS DE TECLADO ---
@@ -951,6 +1090,8 @@ function initKeyboardShortcuts() {
         if (e.key === 'Escape') {
             window.closeModal();
             document.getElementById('import-modal').classList.add('hidden');
+            document.getElementById('reports-modal')?.classList.add('hidden');
+            window.closeSidebar();
         }
         
         // Ctrl/Cmd + N - Nova tarefa
@@ -986,8 +1127,79 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     initSortable();
+    initMobileSidebarClose(); // Garante que itens do menu fecham a sidebar no mobile
     
     if (window.lucide) {
         window.lucide.createIcons();
     }
 });
+
+// --- SIDEBAR MOBILE ---
+window.toggleSidebar = function() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    const isOpen = sidebar.classList.contains('open');
+    if (isOpen) {
+        window.closeSidebar();
+    } else {
+        sidebar.classList.add('open');
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+};
+
+window.closeSidebar = function() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    sidebar.classList.remove('open');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+};
+
+// Fecha sidebar ao clicar num item de navegação no mobile
+function initMobileSidebarClose() {
+    const sidebarItems = document.querySelectorAll('.sidebar-item, .project-item');
+    sidebarItems.forEach(item => {
+        item.addEventListener('click', () => {
+            if (window.innerWidth < 1024) window.closeSidebar();
+        });
+    });
+}
+
+// --- EXPORTAR CSV ---
+window.exportTasksCSV = function() {
+    const activeTasks = allTasks.filter(t => !t.deleted);
+    if (activeTasks.length === 0) {
+        window.showToast('Nenhuma tarefa para exportar.', 'error');
+        return;
+    }
+
+    // Cabeçalho compatível com Asana
+    const headers = ['Name', 'Section/Column', 'Assignee', 'Due Date', 'Project', 'Notes', 'Tags'];
+    const colTitle = (id) => {
+        const col = allColumns.find(c => c.id === id);
+        return col ? col.title : id;
+    };
+
+    const rows = activeTasks.map(t => [
+        (t.title || '').replace(/,/g, ';'),
+        colTitle(t.status),
+        (t.assignee || '').replace(/,/g, ';'),
+        t.due_date || '',
+        (t.project || 'Geral').replace(/,/g, ';'),
+        (t.description || '').replace(/,/g, ';').replace(/\n/g, ' '),
+        (t.tag || '').replace(/,/g, ';')
+    ]);
+
+    const csvContent = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' }); // BOM para Excel
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `kanbada_export_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    window.showToast(`${activeTasks.length} tarefas exportadas em CSV!`);
+};
