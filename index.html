@@ -1,446 +1,483 @@
-<!doctype html>
-<html lang="pt-BR" class="h-full">
-
+<!DOCTYPE html>
+<html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Kanbada - Gestão de tarefas estilo Kanban inspirado no Asana">
-    <title>Kanbada - Gestão de Tarefas</title>
-
-    <!-- CSS e Bibliotecas Externas -->
-    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
-    <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="src/styles/style.css">
-
-    <style>
-        body {
-            font-family: 'DM Sans', sans-serif;
+    <title>Kanbada - Gestão Inteligente de Tarefas</title>
+    
+    <!-- Meta Tags SEO -->
+    <meta name="description" content="Kanbada é um gerenciador de tarefas dinâmico no estilo Kanban com sincronização real-time, dashboard de relatórios e interface premium.">
+    <meta name="keywords" content="kanban, tarefas, produtividade, firebase, gestao de projetos">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        dark: '#12121f',
+                        'dark-card': '#1e1e36',
+                        'dark-border': '#2a2a44',
+                        primary: '#FF6B8A',
+                        secondary: '#6C63FF'
+                    }
+                }
+            }
         }
+    </script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- SortableJS -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    
+    <!-- SheetJS (XLSX) -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <link rel="stylesheet" href="src/styles/style.css">
+    
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
     </style>
 </head>
+<body class="bg-[#12121f] text-[#e0e0ec] min-h-screen overflow-x-hidden selection:bg-[#FF6B8A]/30">
 
-<body class="h-full overflow-hidden" style="background:#12121f;color:#e0e0ec">
-    <!-- Screen Roots -->
+    <!-- Root de Login (Firebase) -->
     <div id="login-root"></div>
 
-    <div id="app" class="flex h-full w-full hidden">
+    <!-- Interface Principal do App (Oculta até o login) -->
+    <div id="app" class="hidden h-screen flex overflow-hidden">
+        
         <!-- Sidebar -->
-        <aside id="sidebar" class="flex-shrink-0 flex flex-col"
-            style="width:240px;background:#16162a;border-right:1px solid #2a2a44">
-            <!-- Logo -->
-            <div class="p-5 flex items-center gap-3">
-                <div style="width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#FF6B8A,#FF8E53)"
-                    class="flex items-center justify-center">
-                    <i data-lucide="layers" style="width:18px;height:18px;color:#fff"></i>
+        <aside id="sidebar" class="w-64 bg-[#1e1e36] border-r border-[#2a2a44] flex-shrink-0 flex flex-col transition-all duration-300 transform md:translate-x-0 -translate-x-full fixed md:relative z-40 h-full">
+            <div class="p-6 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-gradient-to-tr from-[#FF6B8A] to-[#FF8E53] rounded-lg flex items-center justify-center shadow-lg shadow-[#FF6B8A]/20">
+                        <i data-lucide="layers" class="w-5 h-5 text-white"></i>
+                    </div>
+                    <span class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white to-[#9090b0] bg-clip-text text-transparent">Kanbada</span>
                 </div>
-                <span id="sidebar-title" class="font-bold text-base" style="color:#fff">Kanbada</span>
+                <button onclick="window.closeSidebar()" class="md:hidden text-gray-400 hover:text-white">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
             </div>
 
             <!-- Navegação -->
-            <nav class="flex-1 px-3 space-y-1">
-                <div id="nav-home"
-                    class="sidebar-item active flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer">
-                    <i data-lucide="home" style="width:18px;height:18px;color:#9090b0"></i>
-                    <span style="color:#d0d0e4;font-size:14px">Página Inicial</span>
+            <nav class="flex-1 px-4 py-2 space-y-1 overflow-y-auto custom-scrollbar">
+                <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-3 mb-2 mt-4">Principal</div>
+                
+                <a href="#" onclick="window.setView('board')" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-white/5 group" id="nav-board">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4 text-gray-500 group-hover:text-[#FF6B8A]"></i>
+                    <span>Quadro Kanban</span>
+                </a>
+                
+                <a href="#" onclick="window.setView('list')" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-white/5 group" id="nav-list">
+                    <i data-lucide="list" class="w-4 h-4 text-gray-500 group-hover:text-[#6C63FF]"></i>
+                    <span>Vista em Lista</span>
+                </a>
+
+                <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-3 mb-2 mt-8">Análise</div>
+
+                <a href="#" onclick="window.openReports()" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-white/5 group">
+                    <i data-lucide="bar-chart-2" class="w-4 h-4 text-gray-500 group-hover:text-[#00C9A7]"></i>
+                    <span>Relatórios</span>
+                </a>
+
+                <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-3 mb-2 mt-8 flex justify-between items-center">
+                    Projetos
+                    <button onclick="window.promptNewProject()" class="text-[#FF6B8A] hover:scale-110 transition-transform">
+                        <i data-lucide="plus-circle" class="w-3 h-3"></i>
+                    </button>
+                </div>
+                
+                <div id="projects-list-container" class="space-y-0.5">
+                    <!-- Projetos injetados via JS -->
                 </div>
 
-                <div id="nav-my-tasks" class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer">
-                    <i data-lucide="check-circle" style="width:18px;height:18px;color:#9090b0"></i>
-                    <span style="color:#d0d0e4;font-size:14px">Minhas Tarefas</span>
-                </div>
+                <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-3 mb-2 mt-8">Configurações</div>
 
-                <div id="nav-reports" class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer">
-                    <i data-lucide="bar-chart-2" style="width:18px;height:18px;color:#9090b0"></i>
-                    <span style="color:#d0d0e4;font-size:14px">Relatórios</span>
-                </div>
-
-                <div id="nav-archive" class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer">
-                    <i data-lucide="archive" style="width:18px;height:18px;color:#9090b0"></i>
-                    <span style="color:#d0d0e4;font-size:14px">Arquivo</span>
-                </div>
-
-                <div id="nav-recycle"
-                    class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-red-400 hover:bg-red-900/20">
-                    <i data-lucide="trash-2" style="width:18px;height:18px;color:currentColor"></i>
-                    <span style="font-size:14px;color:currentColor">Reciclagem</span>
-                </div>
-
-                <!-- Projetos -->
-                <div class="mt-6 pt-4" style="border-top:1px solid #2a2a44">
-                    <div class="flex items-center justify-between px-3 mb-2">
-                        <p class="text-xs font-semibold tracking-wider" style="color:#6a6a8e">PROJETOS</p>
-                        <button onclick="window.promptNewProject()"
-                            class="text-[#9090b0] hover:text-[#FF6B8A] transition-colors" title="Novo Projeto">
-                            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-                        </button>
-                    </div>
-
-                    <div id="project-list-sidebar">
-                        <!-- Projetos renderizados dinamicamente aqui -->
-                    </div>
-                </div>
+                <a href="#" onclick="window.setView('archive')" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-white/5 group" id="nav-archive">
+                    <i data-lucide="archive" class="w-4 h-4 text-gray-500 group-hover:text-[#4DA8FF]"></i>
+                    <span>Arquivadas</span>
+                </a>
+                
+                <a href="#" onclick="window.setView('recycle')" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-white/5 group" id="nav-recycle">
+                    <i data-lucide="trash-2" class="w-4 h-4 text-gray-500 group-hover:text-[#FF6B8A]"></i>
+                    <span>Lixeira</span>
+                </a>
             </nav>
 
-            <!-- User Profile -->
-            <div class="p-4" style="border-top:1px solid #2a2a44">
-                <div class="flex items-center gap-3">
-                    <div class="avatar-user avatar w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white cursor-pointer"
-                        style="background:linear-gradient(135deg,#FF6B8A,#c850c0)" onclick="window.logout()"
-                        title="Clique para sair">
-                        U
-                    </div>
+            <!-- User Info (Auth) -->
+            <div class="p-4 bg-white/2 overflow-hidden mt-auto border-t border-[#2a2a44]">
+                <div class="flex items-center gap-3 p-2 rounded-xl bg-black/20">
+                    <div class="avatar-user w-10 h-10 rounded-full bg-gradient-to-tr from-[#6C63FF] to-[#FF6B8A] flex items-center justify-center text-sm font-bold text-white shadow-lg">AM</div>
                     <div class="flex-1 min-w-0">
-                        <p id="user-display-name" style="font-size:13px;color:#e0e0ec;font-weight:500" class="truncate">
-                            Usuário</p>
-                        <p id="user-display-role" style="font-size:11px;color:#7a7a9e">Membro do Time</p>
+                        <div id="user-display-name" class="text-sm font-bold text-white truncate">Usuário</div>
+                        <div id="user-email" class="text-[10px] text-gray-500 truncate">Sincronizado</div>
                     </div>
+                    <button onclick="window.logout()" class="text-gray-500 hover:text-[#FF6B8A] transition-colors p-1.5 rounded-lg hover:bg-white/5">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                    </button>
                 </div>
             </div>
         </aside>
 
-        <!-- Overlay sidebar mobile -->
-        <div id="sidebar-overlay" class="sidebar-overlay" onclick="window.closeSidebar()"></div>
+        <!-- Overlay for Sidebar -->
+        <div id="sidebar-overlay" onclick="window.closeSidebar()" class="fixed inset-0 bg-black/50 z-30 hidden backdrop-blur-sm transition-opacity"></div>
 
-        <!-- Main Content -->
-        <div class="flex-1 flex flex-col h-full overflow-hidden">
-            <!-- Header -->
-            <header class="flex items-center justify-between px-6 py-3 flex-shrink-0"
-                style="border-bottom:1px solid #2a2a44;background:#16162a">
-                <div class="flex items-center gap-3">
-                    <!-- Hamburguer mobile -->
-                    <button id="sidebar-toggle" onclick="window.toggleSidebar()"
-                        class="lg:hidden p-2 rounded-lg hover:bg-white/5 transition-colors flex-shrink-0"
-                        style="color:#9090b0" title="Menu">
-                        <i data-lucide="menu" style="width:20px;height:20px"></i>
+        <!-- Main Content Area -->
+        <main class="flex-1 flex flex-col min-w-0 bg-[#12121f]">
+            
+            <!-- Topbar Header -->
+            <header class="h-16 flex-shrink-0 flex items-center justify-between px-6 border-b border-[#2a2a44] bg-[#12121f]/80 backdrop-blur-md sticky top-0 z-20">
+                <div class="flex items-center gap-4 flex-1">
+                    <button onclick="window.openSidebar()" class="md:hidden p-2 rounded-xl hover:bg-white/5 text-gray-400">
+                        <i data-lucide="menu" class="w-6 h-6"></i>
                     </button>
-                    <h1 id="board-title" class="font-bold text-lg" style="color:#fff">Quadro de Tarefas</h1>
-
-                    <!-- Botões de Importação -->
-                    <button onclick="window.triggerImport()"
-                        class="px-3 py-1.5 rounded-lg flex items-center gap-2 text-[11px] font-bold transition-all active:scale-95"
-                        style="background:rgba(255,107,138,0.1); border:1px solid rgba(255,107,138,0.2); color:#FF6B8A"
-                        title="Importar arquivo Excel ou CSV do Asana">
-                        <i data-lucide="file-up" class="w-3.5 h-3.5"></i> Importar Arquivo
-                    </button>
-
-                    <button onclick="window.importGoogleSheets()"
-                        class="px-3 py-1.5 rounded-lg flex items-center gap-2 text-[11px] font-bold transition-all active:scale-95"
-                        style="background:rgba(108,99,255,0.1); border:1px solid rgba(108,99,255,0.2); color:#6C63FF"
-                        title="Importar de uma planilha pública do Google Sheets">
-                        <i data-lucide="link" class="w-3.5 h-3.5"></i> Google Sheets
-                    </button>
-
-                    <div class="h-6 w-[1px] bg-[#2a2a44] mx-2 hidden lg:block"></div>
                     
-                    <!-- Alternar Visualização -->
-                    <div class="flex items-center bg-[#1e1e36] rounded-lg p-1 border border-[#2a2a44] mr-2">
-                        <button onclick="window.setViewMode('board')" id="view-board-btn" 
-                            class="p-1.5 rounded-md transition-all active:scale-95 text-[#FF6B8A] bg-[#FF6B8A]/10" title="Vista Kanban">
-                            <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
-                        </button>
-                        <button onclick="window.setViewMode('list')" id="view-list-btn" 
-                            class="p-1.5 rounded-md transition-all active:scale-95 text-[#9090b0] hover:text-white" title="Vista em Lista">
-                            <i data-lucide="list" class="w-4 h-4"></i>
-                        </button>
-                    </div>
-
-                    <div class="flex items-center gap-1" id="export-group">
-                        <button onclick="window.exportTasks()"
-                            class="px-3 py-1.5 rounded-lg flex items-center gap-2 text-[11px] font-bold transition-all active:scale-95"
-                            style="background:rgba(0,201,167,0.1); border:1px solid rgba(0,201,167,0.2); color:#00C9A7"
-                            title="Exportar backup JSON (Ctrl+E)">
-                            <i data-lucide="download" class="w-3.5 h-3.5"></i> JSON
-                        </button>
-                        <button onclick="window.exportTasksCSV()"
-                            class="px-3 py-1.5 rounded-lg flex items-center gap-2 text-[11px] font-bold transition-all active:scale-95"
-                            style="background:rgba(0,201,167,0.1); border:1px solid rgba(0,201,167,0.2); color:#00C9A7"
-                            title="Exportar tarefas em CSV (compatível Asana)">
-                            <i data-lucide="table" class="w-3.5 h-3.5"></i> CSV
-                        </button>
-                    </div>
-
-                    <input type="file" id="asana-import-input" accept=".xlsx,.xls,.csv" class="hidden"
-                        onchange="window.handleAsanaImport(event)">
-                </div>
-
-                <!-- Busca -->
-                <div class="flex-1 max-w-md mx-4 relative">
-                    <div class="relative">
-                        <i data-lucide="search"
-                            style="width:16px;height:16px;color:#6a6a8e;position:absolute;left:12px;top:50%;transform:translateY(-50%)"></i>
-                        <input type="text" id="search-input" placeholder="Buscar tarefas... (Ctrl+K)"
-                            class="w-full py-2 pl-10 pr-4 rounded-lg text-sm outline-none"
-                            style="background:#1e1e36;border:1px solid #2a2a44;color:#e0e0ec">
-                    </div>
-                    <div id="filter-indicator"
-                        class="hidden absolute top-full left-0 right-0 py-1 bg-[#16162a]/90 backdrop-blur z-10 text-center mt-1 rounded-lg">
-                        <button onclick="window.clearFilters()"
-                            class="text-[10px] text-[#FF6B8A] hover:underline flex items-center justify-center gap-1 mx-auto">
-                            <i data-lucide="x" class="w-2.5 h-2.5"></i> Limpar Filtros Ativos
-                        </button>
+                    <!-- Busca Dinâmica -->
+                    <div class="relative w-full max-w-md group">
+                        <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-[#FF6B8A] transition-colors"></i>
+                        <input type="text" id="search-input" placeholder="Pesquisar tarefas, projetos ou tags..." 
+                            class="w-full h-10 bg-[#1e1e36] border border-[#2a2a44] rounded-xl pl-10 pr-4 text-sm outline-none focus:border-[#FF6B8A] focus:ring-1 focus:ring-[#FF6B8A]/20 transition-all placeholder:text-gray-600">
                     </div>
                 </div>
 
-                <!-- Notificações e Avatar -->
-                <div class="flex items-center gap-4">
-                    <div class="relative">
-                        <button id="noti-bell" class="relative hover:bg-white/5 p-2 rounded-lg transition-colors"
-                            style="color:#9090b0" title="Notificações">
-                            <i data-lucide="bell" style="width:20px;height:20px"></i>
-                            <span id="noti-badge" class="hidden"
-                                style="position:absolute;top:6px;right:6px;width:8px;height:8px;background:#FF6B8A;border-radius:50%;border:2px solid #16162a"></span>
-                        </button>
+                <div class="flex items-center gap-3">
+                    <!-- Botão Filtro Meus -->
+                    <button id="btn-filter-my" onclick="window.toggleMyTasks()" 
+                        class="hidden md:flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all border border-[#2a2a44] hover:bg-white/5">
+                        <i data-lucide="user" class="w-4 h-4"></i>
+                        <span>Minhas Tarefas</span>
+                    </button>
 
-                        <!-- Dropdown Notificações -->
-                        <div id="notification-dropdown"
-                            class="absolute right-0 mt-2 w-64 bg-[#1e1e36] rounded-xl overflow-hidden hidden z-50">
-                            <div class="p-3 border-b border-[#2a2a44] bg-[#2a2a44]/30 flex items-center justify-between">
-                                <h4 class="text-xs font-bold text-white">Notificações</h4>
-                                <button onclick="window.clearNotifications()" class="text-[10px] font-bold text-[#FF6B8A] hover:text-pink-400 transition-colors">Limpar</button>
+                    <!-- Notificações -->
+                    <div class="relative">
+                        <button onclick="window.toggleNotifications()" class="p-2.5 rounded-xl hover:bg-white/5 text-gray-400 relative group">
+                            <i data-lucide="bell" class="w-5 h-5 group-hover:text-[#FFB84D] transition-colors"></i>
+                            <span id="notif-badge" class="absolute top-2 right-2 w-2 h-2 bg-[#FF6B8A] rounded-full border-2 border-[#12121f] hidden"></span>
+                        </button>
+                        
+                        <!-- Popover Notificações -->
+                        <div id="notif-popover" class="absolute right-0 mt-3 w-80 bg-[#1e1e36] border border-[#2a2a44] rounded-2xl shadow-2xl hidden z-[100] animate-in fade-in zoom-in duration-200">
+                            <div class="p-4 border-b border-[#2a2a44] flex items-center justify-between">
+                                <span class="text-sm font-bold">Notificações</span>
+                                <button onclick="window.clearNotifications()" class="text-[10px] font-bold text-[#FF6B8A] hover:underline">Limpar tudo</button>
                             </div>
-                            <div id="noti-list" class="max-h-64 overflow-y-auto"></div>
+                            <div id="notif-list" class="max-h-80 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                                <!-- Notificações injetadas via JS -->
+                                <div class="p-4 text-center text-xs text-gray-500 italic">Nenhuma notificação nova</div>
+                            </div>
                         </div>
                     </div>
+                    
+                    <div class="h-6 w-[1px] bg-[#2a2a44] mx-1"></div>
+
+                    <!-- Botão Nova Tarefa -->
+                    <button onclick="window.openModal('plan')" class="flex items-center gap-2 bg-[#FF6B8A] hover:bg-pink-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95 shadow-lg shadow-pink-500/20">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        <span class="hidden sm:inline">Nova Tarefa</span>
+                    </button>
                 </div>
             </header>
-            
-            <!-- Barra de Ações em Massa (Oculta por padrão) -->
-            <div id="bulk-actions-bar" class="hidden h-12 bg-[#FF6B8A]/10 border-b border-[#FF6B8A]/20 flex items-center justify-between px-6 transition-all duration-300">
-                <div class="flex items-center gap-4">
-                    <span id="selected-count" class="text-xs font-bold text-[#FF6B8A]">0 selecionadas</span>
-                    <div class="h-4 w-[1px] bg-[#2a2a44]"></div>
-                    <button onclick="window.bulkSelectAll()" class="text-[11px] font-semibold text-gray-300 hover:text-white transition-colors">SELECIONAR TUDO</button>
+
+            <!-- Board Header (Barra de Ações Secundária) -->
+            <div class="flex-shrink-0 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center gap-3 overflow-x-auto no-scrollbar pb-1">
+                    <h2 id="view-title" class="text-lg font-extrabold text-white mr-2 whitespace-nowrap">Quadro Kanban</h2>
+                    <div id="active-filters-chips" class="flex items-center gap-2">
+                        <!-- Chips de filtros ativos injetados -->
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 ml-auto">
+                    <!-- Botões de Ação em Massa (Aparecem quando tarefas são selecionadas) -->
+                    <div id="bulk-actions" class="hidden items-center gap-2 px-3 py-1.5 bg-[#FF6B8A]/10 border border-[#FF6B8A]/30 rounded-xl animate-fade-in">
+                        <span id="bulk-count" class="text-xs font-bold text-[#FF6B8A] mr-2">3 Selecionados</span>
+                        <div class="flex gap-1">
+                            <select id="bulk-status-select" onchange="window.bulkMoveToColumn(this.value); this.value=''" 
+                                class="bg-[#12121f] text-[10px] font-bold text-white px-2 py-1 rounded border border-[#FF6B8A]/30 outline-none">
+                                <option value="">Mover para...</option>
+                                <!-- Colunas injetadas -->
+                            </select>
+                            <button onclick="window.bulkArchive()" class="p-1.5 rounded-lg hover:bg-[#FF6B8A]/20 text-[#FF6B8A]" title="Arquivar selecionados"><i data-lucide="archive" class="w-3.5 h-3.5"></i></button>
+                            <button onclick="window.bulkDelete()" class="p-1.5 rounded-lg hover:bg-[#FF6B8A]/20 text-[#FF6B8A]" title="Excluir selecionados"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                            <button onclick="window.clearSelection()" class="p-1.5 rounded-lg hover:bg-white/10 text-gray-400" title="Cancelar seleção"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-1 bg-[#1e1e36] p-1 rounded-xl border border-[#2a2a44]">
+                        <button onclick="window.triggerImport()" class="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-all group" title="Importar CSV/Asana">
+                            <i data-lucide="upload-cloud" class="w-4 h-4 group-hover:scale-110 transition-transform"></i>
+                            <input type="file" id="asana-import-input" class="hidden" accept=".csv, .xlsx" onchange="window.handleFileImport(event)">
+                        </button>
+                        <button onclick="window.exportTasks()" class="p-2 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white transition-all group" title="Exportar para Excel/CSV">
+                            <i data-lucide="download" class="w-4 h-4 group-hover:scale-110 transition-transform"></i>
+                        </button>
+                    </div>
                     
-                    <!-- Dropdown Selecionar por Status -->
-                    <div class="relative group">
-                        <button class="text-[11px] font-semibold text-gray-300 hover:text-white transition-colors flex items-center gap-1">
-                            SELECIONAR POR STATUS <i data-lucide="chevron-down" class="w-3 h-3"></i>
-                        </button>
-                        <div id="bulk-select-dropdown" class="absolute left-0 top-full mt-1 w-48 bg-[#1e1e36] border border-[#2a2a44] rounded-lg shadow-xl hidden group-hover:block z-50 py-1">
-                            <!-- Preenchido dinamicamente -->
-                        </div>
-                    </div>
-
-                    <div class="h-4 w-[1px] bg-[#2a2a44]"></div>
-
-                    <!-- Dropdown Mover para... -->
-                    <div class="relative group">
-                        <button class="text-[11px] font-semibold text-gray-300 hover:text-white transition-colors flex items-center gap-1">
-                            MOVER PARA <i data-lucide="chevron-down" class="w-3 h-3"></i>
-                        </button>
-                        <div id="bulk-move-dropdown" class="absolute left-0 top-full mt-1 w-48 bg-[#1e1e36] border border-[#2a2a44] rounded-lg shadow-xl hidden group-hover:block z-50 py-1">
-                            <!-- Preenchido dinamicamente -->
-                        </div>
-                    </div>
+                    <button onclick="window.promptNewColumn()" class="md:flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all border border-[#2a2a44] hover:bg-white/5 text-[#9090b0] hover:text-white">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        <span class="hidden lg:inline">Nova Coluna</span>
+                    </button>
                 </div>
+            </div>
 
+            <!-- Area de Scroll do Kanban -->
+            <div id="kanban-scroll-area" class="flex-1 overflow-x-auto overflow-y-hidden custom-scrollbar">
+                <div id="kanban-board-container" class="flex h-full p-6 pt-2 gap-6 min-w-max">
+                    <!-- Colunas injetadas via JS -->
+                </div>
+            </div>
+            
+        </main>
+    </div>
+
+    <!-- MODAL: NOVA/EDITAR TAREFA -->
+    <div id="task-modal" class="fixed inset-0 z-[2000] hidden flex items-center justify-center p-4">
+        <div id="modal-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="window.closeModal()"></div>
+        <div class="relative bg-[#1e1e36] w-full max-w-2xl rounded-3xl border border-[#2a2a44] shadow-2xl overflow-hidden animate-zoom-in">
+            <!-- Barra Superior do Modal -->
+            <div class="px-6 py-4 border-b border-[#2a2a44] flex items-center justify-between bg-[#2a2a44]/20">
                 <div class="flex items-center gap-2">
-                    <button onclick="window.clearSelection()" class="px-3 py-1.5 rounded-lg text-[11px] font-bold text-gray-400 hover:bg-white/5 transition-colors">CANCELAR</button>
-                    <button onclick="window.bulkArchive()" class="px-3 py-1.5 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all active:scale-95"
-                        style="background:rgba(0,201,167,0.1);border:1px solid rgba(0,201,167,0.2);color:#00C9A7"
-                        title="Arquivar tarefas selecionadas">
-                        <i data-lucide="archive" class="w-3.5 h-3.5"></i> ARQUIVAR
-                    </button>
-                    <button onclick="window.bulkDelete()" class="px-4 py-1.5 bg-[#FF6B8A] hover:bg-pink-600 text-white text-[11px] font-bold rounded-lg shadow-lg shadow-pink-500/20 transition-all flex items-center gap-2 active:scale-95">
-                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> EXCLUIR
-                    </button>
+                    <div class="w-2 h-2 rounded-full bg-[#FF6B8A] animate-pulse"></div>
+                    <h3 id="modal-title" class="text-sm font-extrabold uppercase tracking-widest text-[#FF6B8A]">Nova Tarefa</h3>
                 </div>
-            </div>
-
-            <!-- Kanban Board -->
-            <div class="flex-1 overflow-auto p-6 flex flex-col lg:flex-row lg:items-start gap-6 h-full">
-                <div id="kanban-board-container" class="kanban-board flex flex-col lg:flex-row gap-6 h-full">
-                    <!-- Colunas renderizadas dinamicamente aqui -->
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal: Relatórios -->
-    <div id="reports-modal" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center hidden">
-        <div id="reports-content" style="background:#1e1e36;border:1px solid #2a2a44;border-radius:16px;width:700px;max-width:95%;max-height:90vh;overflow-y:auto"
-            class="p-6">
-            <!-- Preenchido dinamicamente pelo JS -->
-        </div>
-    </div>
-
-    <!-- Modal: Nova/Editar Tarefa -->
-    <div id="modal-overlay" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center hidden">
-        <div style="background:#1e1e36;border:1px solid #2a2a44;border-radius:16px;width:400px;max-width:90%"
-            class="p-6">
-            <div class="flex items-center justify-between mb-5">
-                <h2 id="modal-title" class="font-bold text-base" style="color:#fff">Nova Tarefa</h2>
-                <button onclick="window.closeModal()" style="color:#9090b0" title="Fechar (ESC)">
-                    <i data-lucide="x" style="width:20px;height:20px"></i>
+                <button onclick="window.closeModal()" class="text-gray-500 hover:text-white hover:rotate-90 transition-all duration-300">
+                    <i data-lucide="x" class="w-6 h-6"></i>
                 </button>
             </div>
+            
+            <form id="task-form" onsubmit="window.handleSubmit(event)" class="p-6">
+                <input type="hidden" id="f-status" value="plan">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Coluna Esquerda -->
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Título da Tarefa</label>
+                            <input type="text" id="f-title" placeholder="O que precisa ser feito?" required
+                                class="w-full bg-[#12121f] border border-[#2a2a44] rounded-xl px-4 py-2.5 outline-none focus:border-[#FF6B8A] focus:ring-1 focus:ring-[#FF6B8A]/20 transition-all">
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Data Limite</label>
+                                <input type="date" id="f-date"
+                                    class="w-full bg-[#12121f] border border-[#2a2a44] rounded-xl px-4 py-2 outline-none focus:border-[#6C63FF] transition-all text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Responsável</label>
+                                <input type="text" id="f-assignee" placeholder="Nome"
+                                    class="w-full bg-[#12121f] border border-[#2a2a44] rounded-xl px-4 py-2 outline-none focus:border-[#6C63FF] transition-all text-sm">
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Projeto</label>
+                                <select id="f-project"
+                                    class="w-full bg-[#12121f] border border-[#2a2a44] rounded-xl px-4 py-2 outline-none focus:border-[#00C9A7] transition-all text-sm appearance-none">
+                                    <option value="Geral">Geral</option>
+                                    <!-- Outros projetos via JS -->
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Etiqueta (Tag)</label>
+                                <div class="flex gap-2">
+                                    <input type="text" id="f-tag" placeholder="Ex: Urgente"
+                                        class="flex-1 bg-[#12121f] border border-[#2a2a44] rounded-xl px-4 py-2 outline-none focus:border-[#FFB84D] transition-all text-sm">
+                                    <input type="color" id="f-tagcolor" value="#FF6B8A"
+                                        class="w-10 h-10 bg-transparent border-none cursor-pointer rounded-lg overflow-hidden">
+                                </div>
+                            </div>
+                        </div>
 
-            <form id="task-form" class="space-y-4" onsubmit="window.handleSubmit(event)">
-                <div>
-                    <label class="block text-xs font-medium mb-1" style="color:#9090b0" for="f-title">Título da Tarefa
-                        *</label>
-                    <input id="f-title" required class="w-full py-2 px-3 rounded-lg text-sm outline-none"
-                        style="background:#12121f;border:1px solid #2a2a44;color:#e0e0ec"
-                        placeholder="Digite o título da tarefa" maxlength="100">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Descrição</label>
+                            <textarea id="f-description" rows="4" placeholder="Detalhes da tarefa..."
+                                class="w-full bg-[#12121f] border border-[#2a2a44] rounded-xl px-4 py-2.5 outline-none focus:border-[#FF6B8A] transition-all text-sm resize-none custom-scrollbar"></textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Coluna Direita (Subtarefas e Anexos) -->
+                    <div class="flex flex-col h-full">
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">Subtarefas</label>
+                                <span id="subtask-count" class="text-[10px] font-bold text-[#FF6B8A]">0 itens</span>
+                            </div>
+                            
+                            <div class="flex gap-2 mb-3">
+                                <input type="text" id="new-subtask-text" placeholder="Adicionar passo..."
+                                    class="flex-1 bg-[#12121f] border border-[#2a2a44] rounded-xl px-4 py-2 outline-none focus:border-[#FF6B8A] transition-all text-xs">
+                                <button type="button" onclick="window.addSubtask()" class="bg-[#1e1e36] border border-[#2a2a44] hover:border-[#FF6B8A] hover:text-[#FF6B8A] w-9 h-9 rounded-xl flex items-center justify-center transition-all">
+                                    <i data-lucide="plus" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                            
+                            <div id="subtasks-container" class="max-h-56 overflow-y-auto custom-scrollbar pr-2 space-y-2 mb-4">
+                                <!-- Subtarefas injetadas via JS -->
+                                <div class="text-center py-8 text-gray-600 italic text-xs border-2 border-dashed border-[#2a2a44] rounded-2xl">
+                                    Nenhuma subtarefa adicionada
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Anexo de Arquivos -->
+                        <div class="pt-4 border-t border-[#2a2a44]">
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Anexo (Opcional)</label>
+                            <div class="relative">
+                                <input type="file" id="f-file" class="hidden">
+                                <button type="button" onclick="document.getElementById('f-file').click()" 
+                                    class="w-full bg-[#12121f] border-2 border-dashed border-[#2a2a44] hover:border-[#FF6B8A] hover:bg-[#FF6B8A]/5 rounded-xl p-4 transition-all group">
+                                    <div class="flex flex-col items-center gap-1 text-gray-500 group-hover:text-[#FF6B8A]">
+                                        <i data-lucide="paperclip" class="w-5 h-5"></i>
+                                        <span class="text-[10px] font-bold uppercase tracking-widest">Selecionar Arquivo (Max 1MB)</span>
+                                        <span id="file-name-display" class="text-[9px] lowercase italic mt-1 hidden"></span>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-
-                <div class="flex gap-3">
-                    <div class="flex-1">
-                        <label class="block text-xs font-medium mb-1" style="color:#9090b0" for="f-date">Data de
-                            Entrega</label>
-                        <input id="f-date" type="date" class="w-full py-2 px-3 rounded-lg text-sm outline-none"
-                            style="background:#12121f;border:1px solid #2a2a44;color:#e0e0ec">
-                    </div>
-                    <div class="flex-1">
-                        <label class="block text-xs font-medium mb-1" style="color:#9090b0"
-                            for="f-assignee">Responsável</label>
-                        <input id="f-assignee" class="w-full py-2 px-3 rounded-lg text-sm outline-none"
-                            style="background:#12121f;border:1px solid #2a2a44;color:#e0e0ec" placeholder="Nome">
-                    </div>
+                
+                <!-- Footer do Modal -->
+                <div class="mt-8 flex items-center justify-end gap-3 pt-4 border-t border-[#2a2a44]">
+                    <button type="button" onclick="window.closeModal()" class="px-6 py-2.5 rounded-xl text-sm font-bold text-gray-400 hover:bg-white/5 transition-all">Cancelar</button>
+                    <button type="submit" class="bg-gradient-to-r from-[#FF6B8A] to-[#FF8E53] hover:scale-105 px-8 py-2.5 rounded-xl text-sm font-extrabold text-white shadow-lg shadow-pink-500/20 transition-all active:scale-95">Salvar Tarefa</button>
                 </div>
-
-                <div>
-                    <label class="block text-xs font-medium mb-1" style="color:#9090b0" for="f-description">Descrição da Tarefa</label>
-                    <textarea id="f-description" class="w-full py-2 px-3 rounded-lg text-sm outline-none resize-none"
-                        style="background:#12121f;border:1px solid #2a2a44;color:#e0e0ec" rows="3"
-                        placeholder="Detalhes adicionais da tarefa..."></textarea>
-                </div>
-
-                <div class="flex gap-3">
-                    <div class="flex-1">
-                        <label class="block text-xs font-medium mb-1" style="color:#9090b0"
-                            for="f-project">Projeto</label>
-                        <select id="f-project" class="w-full py-2 px-3 rounded-lg text-sm outline-none"
-                            style="background:#12121f;border:1px solid #2a2a44;color:#e0e0ec">
-                            <option value="">Geral</option>
-                            <!-- Opções preenchidas dinamicamente -->
-                        </select>
-                    </div>
-                    <div class="flex-1">
-                        <label class="block text-xs font-medium mb-1" style="color:#9090b0" for="f-tag">Etiqueta (Tag)</label>
-                        <input id="f-tag" class="w-full py-2 px-3 rounded-lg text-sm outline-none"
-                            style="background:#12121f;border:1px solid #2a2a44;color:#e0e0ec" placeholder="Ex: Urgente">
-                    </div>
-                    <div class="flex-1">
-                        <label class="block text-xs font-medium mb-1" style="color:#9090b0" for="f-tagcolor">Cor da
-                            Tag</label>
-                        <select id="f-tagcolor" class="w-full py-2 px-3 rounded-lg text-sm outline-none"
-                            style="background:#12121f;border:1px solid #2a2a44;color:#e0e0ec">
-                            <option value="#FF6B8A">Rosa</option>
-                            <option value="#6C63FF">Roxo</option>
-                            <option value="#00C9A7">Verde</option>
-                            <option value="#FFB84D">Laranja</option>
-                            <option value="#4DA8FF">Azul</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="flex gap-3 items-center">
-                    <div class="flex-1">
-                        <label class="block text-xs font-medium mb-1" style="color:#9090b0" for="f-status">Status (Coluna)</label>
-                        <select id="f-status" class="w-full py-2 px-3 rounded-lg text-sm outline-none"
-                            style="background:#12121f;border:1px solid #2a2a44;color:#e0e0ec">
-                            <!-- Preenchido dinamicamente no JS -->
-                        </select>
-                    </div>
-                    <div class="flex-1">
-                        <label class="block text-xs font-medium mb-1" style="color:#9090b0" for="f-file">Anexo (Max 1GB)</label>
-                        <input type="file" id="f-file" class="w-full text-xs" style="color:#e0e0ec" onchange="window.validateFileSize(this)">
-                        <input type="hidden" id="f-filename">
-                    </div>
-                </div>
-
-                <!-- Subtarefas -->
-                <div class="pt-2 border-t border-[#2a2a44]">
-                    <div class="flex items-center justify-between mb-2">
-                        <label class="text-xs font-medium" style="color:#9090b0">Subtarefas</label>
-                        <span id="subtask-progress" class="text-[10px] text-[#FF6B8A] font-bold">0/0</span>
-                    </div>
-                    <div id="subtasks-container" class="space-y-2 max-h-32 overflow-y-auto pr-1">
-                        <!-- Lista de subtarefas -->
-                    </div>
-                    <div class="flex gap-2 mt-2">
-                        <input type="text" id="new-subtask-input" placeholder="Adicionar subtarefa..." 
-                            class="flex-1 bg-[#12121f] border border-[#2a2a44] rounded-lg px-3 py-1.5 text-xs text-[#e0e0ec] outline-none focus:border-[#FF6B8A]">
-                        <button type="button" onclick="window.addSubtask()" 
-                            class="p-1.5 bg-[#FF6B8A]/10 text-[#FF6B8A] rounded-lg hover:bg-[#FF6B8A]/20 transition-colors">
-                            <i data-lucide="plus" class="w-4 h-4"></i>
-                        </button>
-                    </div>
-                </div>
-
-                <div id="form-error" class="text-xs hidden p-2 rounded-lg"
-                    style="color:#FF6B8A;background:rgba(255,107,138,0.1);border:1px solid rgba(255,107,138,0.2)"></div>
-
-                <button id="submit-btn" type="submit"
-                    class="w-full py-2.5 rounded-lg font-semibold text-sm transition-all active:scale-95"
-                    style="background:linear-gradient(135deg,#FF6B8A,#FF8E53);color:#fff">
-                    Adicionar Tarefa
-                </button>
             </form>
         </div>
     </div>
 
-    <!-- Modal: Conflito de Importação -->
-    <div id="import-modal" class="modal-overlay fixed inset-0 z-[60] flex items-center justify-center hidden">
-        <div style="background:#1e1e36;border:1px solid #2a2a44;border-radius:16px;width:400px;max-width:90%"
-            class="p-6">
-            <h2 class="font-bold text-base text-white mb-3">Conflito de Tarefas Detectado</h2>
-            <p id="import-modal-msg" class="text-xs text-gray-400 mb-6 leading-relaxed"></p>
-            <div class="flex flex-col gap-2">
-                <button onclick="window.confirmImport('replace')"
-                    class="w-full py-2.5 bg-[#FF6B8A] text-white text-xs font-bold rounded-lg hover:opacity-90 transition-all active:scale-95">
-                    Substituir Existentes
-                </button>
-                <button onclick="window.confirmImport('copy')"
-                    class="w-full py-2.5 bg-white/5 text-gray-300 text-xs font-bold rounded-lg hover:bg-white/10 transition-all active:scale-95">
-                    Criar Cópias (Duplicar)
-                </button>
-                <button onclick="window.confirmImport('cancel')"
-                    class="w-full py-2.5 bg-transparent text-gray-500 text-xs font-bold rounded-lg border border-[#2a2a44] hover:border-gray-500 transition-all active:scale-95">
-                    Cancelar Importação
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Toast de Notificação -->
-    <div id="toast" class="fixed bottom-6 right-6 z-50 hidden px-4 py-3 rounded-lg text-sm font-medium shadow-2xl"
-        style="background:#2a2a44;color:#e0e0ec"></div>
-
-    <!-- Scripts (ORDEM CORRETA) -->
-    <script src="src/services/data_mapper.js"></script>
-    <script src="src/components/Card.js"></script>
-    <script src="src/components/Column.js"></script>
-    <script src="src/components/Login.js"></script>
-    <script src="src/app.js"></script>
-    <!-- Modal de Prompt Customizado -->
-    <div id="prompt-modal" class="modal-overlay hidden fixed inset-0 flex items-center justify-center z-[2000] p-4">
-        <div class="bg-[#1e1e36] w-full max-w-sm rounded-2xl border border-[#2a2a44] shadow-2xl overflow-hidden p-6 scale-95 transition-all duration-300" id="prompt-modal-container">
-            <div class="flex items-center gap-3 mb-4">
-                <div id="prompt-icon-container" class="p-2 rounded-lg bg-[#FF6B8A]/10 text-[#FF6B8A]">
-                    <i data-lucide="help-circle" class="w-5 h-5"></i>
-                </div>
+    <!-- MODAL: RELATÓRIOS -->
+    <div id="reports-modal" class="fixed inset-0 z-[2500] hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-md" onclick="document.getElementById('reports-modal').classList.add('hidden')"></div>
+        <div class="relative bg-[#1e1e36] w-full max-w-5xl h-[90vh] rounded-[32px] border border-[#2a2a44] shadow-2xl overflow-hidden flex flex-col animate-zoom-in">
+            <div class="px-8 py-6 border-b border-[#2a2a44] flex items-center justify-between">
                 <div>
-                    <h3 id="prompt-modal-title" class="text-white font-bold text-base leading-tight"></h3>
+                    <h2 class="text-2xl font-extrabold text-white tracking-tight">Relatórios de Produtividade</h2>
+                    <p class="text-xs text-gray-500 mt-1">Análise detalhada do desempenho do seu quadro</p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <button onclick="window.printReport()" class="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-gray-300 transition-all border border-white/10">
+                        <i data-lucide="printer" class="w-4 h-4"></i> Imprimir
+                    </button>
+                    <button onclick="document.getElementById('reports-modal').classList.add('hidden')" class="text-gray-500 hover:text-white transition-all">
+                        <i data-lucide="x" class="w-8 h-8"></i>
+                    </button>
                 </div>
             </div>
-            <p id="prompt-modal-message" class="text-xs text-[#9090b0] mb-4 leading-relaxed"></p>
-            <div id="prompt-input-wrapper">
-                <input type="text" id="prompt-modal-input" 
-                    class="w-full bg-[#12121f] border border-[#2a2a44] rounded-xl px-4 py-3 text-white text-sm focus:border-[#FF6B8A] focus:ring-1 focus:ring-[#FF6B8A] focus:outline-none transition-all placeholder:text-gray-600"
-                    placeholder="Digite aqui...">
-            </div>
-            <div class="flex justify-end gap-3 mt-6">
-                <button id="prompt-modal-cancel" class="px-4 py-2 text-xs font-bold text-gray-400 hover:text-white transition-colors">CANCELAR</button>
-                <button id="prompt-modal-confirm" class="px-6 py-2 bg-[#FF6B8A] hover:bg-pink-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-pink-500/20 transition-all active:scale-95">CONFIRMAR</button>
+            
+            <div class="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                <!-- Dashboard de KPIs -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
+                    <div class="bg-[#12121f] p-6 rounded-3xl border border-[#2a2a44] relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 w-20 h-20 bg-[#FF6B8A]/10 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
+                        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Total de Tarefas</div>
+                        <div id="kpi-total" class="text-3xl font-extrabold text-white">0</div>
+                    </div>
+                    <div class="bg-[#12121f] p-6 rounded-3xl border border-[#2a2a44] relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 w-20 h-20 bg-[#00C9A7]/10 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
+                        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Concluídas</div>
+                        <div id="kpi-done" class="text-3xl font-extrabold text-[#00C9A7]">0</div>
+                    </div>
+                    <div class="bg-[#12121f] p-6 rounded-3xl border border-[#2a2a44] relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 w-20 h-20 bg-[#6C63FF]/10 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
+                        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Taxa de Sucesso</div>
+                        <div id="kpi-rate" class="text-3xl font-extrabold text-[#6C63FF]">0%</div>
+                    </div>
+                    <div class="bg-[#12121f] p-6 rounded-3xl border border-[#2a2a44] relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 w-20 h-20 bg-[#FFB84D]/10 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
+                        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Em Atraso</div>
+                        <div id="kpi-late" class="text-3xl font-extrabold text-[#FFB84D]">0</div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                    <!-- Gráfico 1: Status -->
+                    <div class="bg-[#12121f]/50 p-8 rounded-[32px] border border-[#2a2a44]">
+                        <h4 class="text-sm font-bold text-white mb-6 flex items-center gap-2">
+                            <i data-lucide="pie-chart" class="w-4 h-4 text-[#FF6B8A]"></i> Distribuição por Status
+                        </h4>
+                        <div class="h-64 flex items-center justify-center">
+                            <canvas id="chart-status"></canvas>
+                        </div>
+                    </div>
+                    
+                    <!-- Gráfico 2: Projetos -->
+                    <div class="bg-[#12121f]/50 p-8 rounded-[32px] border border-[#2a2a44]">
+                        <h4 class="text-sm font-bold text-white mb-6 flex items-center gap-2">
+                            <i data-lucide="folder" class="w-4 h-4 text-[#6C63FF]"></i> Tarefas por Projeto
+                        </h4>
+                        <div class="h-64 flex items-center justify-center">
+                            <canvas id="chart-projects"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Gráfico 3: Ranking de Responsáveis -->
+                    <div class="bg-[#12121f]/50 p-8 rounded-[32px] border border-[#2a2a44]">
+                        <h4 class="text-sm font-bold text-white mb-6 flex items-center gap-2">
+                            <i data-lucide="users" class="w-4 h-4 text-[#00C9A7]"></i> Ranking de Produtividade
+                        </h4>
+                        <div class="h-64 flex items-center justify-center">
+                            <canvas id="chart-users"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Quadro de Insights Rápidos -->
+                    <div class="bg-gradient-to-br from-[#6C63FF]/10 to-[#FF6B8A]/10 p-8 rounded-[32px] border border-white/5">
+                        <h4 class="text-sm font-bold text-white mb-6">Sugestões de IA</h4>
+                        <div id="report-insights" class="space-y-4">
+                            <!-- Insights gerados via JS -->
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-</body>
 
+    <!-- MODAL CUSTOM: PROMPT/CONFIRM -->
+    <div id="custom-dialog" class="fixed inset-0 z-[5000] hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-md"></div>
+        <div class="relative bg-[#1e1e36] w-full max-w-md rounded-[28px] border border-[#2a2a44] shadow-2xl p-8 animate-zoom-in">
+            <div id="dialog-icon" class="w-16 h-16 rounded-2xl bg-[#FF6B8A]/10 flex items-center justify-center mb-6 mx-auto">
+                <i data-lucide="help-circle" class="w-8 h-8 text-[#FF6B8A]"></i>
+            </div>
+            <h3 id="dialog-title" class="text-xl font-bold text-white text-center mb-2">Título</h3>
+            <p id="dialog-msg" class="text-gray-400 text-center text-sm leading-relaxed mb-8">Mensagem do diálogo</p>
+            
+            <div id="dialog-input-container" class="hidden mb-8">
+                <input type="text" id="dialog-input" class="w-full bg-[#12121f] border border-[#2a2a44] rounded-xl px-4 py-3 outline-none focus:border-[#FF6B8A] text-sm text-white">
+            </div>
+            
+            <div class="flex flex-col gap-3">
+                <button id="dialog-confirm" class="w-full bg-[#FF6B8A] hover:bg-pink-600 text-white font-extrabold py-3.5 rounded-xl transition-all shadow-lg shadow-pink-500/20 active:scale-95">Confirmar</button>
+                <button id="dialog-cancel" class="w-full bg-white/5 hover:bg-white/10 text-gray-400 font-bold py-3.5 rounded-xl transition-all active:scale-95">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts do App -->
+    <script type="module" src="src/app.js"></script>
+    <script type="module" src="src/components/Login.js"></script>
+    <script type="module" src="src/components/Card.js"></script>
+    <script type="module" src="src/components/Column.js"></script>
+    
+    <script>
+        // Inicializa Lucide no carregamento
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.lucide) window.lucide.createIcons();
+        });
+    </script>
+</body>
 </html>

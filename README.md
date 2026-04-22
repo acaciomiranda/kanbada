@@ -1,79 +1,77 @@
-# 📋 Kanbada - Gestão Inteligente de Tarefas
+# 📋 Kanbada - Gestão Inteligente de Tarefas (Cloud Edition)
 
-**Kanbada** é um gerenciador de tarefas dinâmico no estilo Kanban projetado para máxima produtividade, simplicidade e personalização. Inspirado em plataformas como Trello e Asana, ele oferece uma interface moderna em *Dark Mode*, suportando fluxos de trabalho avançados que combinam beleza visual e funcionalidades completas.
+**Kanbada** é um gerenciador de tarefas dinâmico no estilo Kanban projetado para máxima produtividade, simplicidade e personalização. Agora em sua versão **Cloud Native**, o projeto utiliza a infraestrutura do **Firebase** para garantir que seus dados estejam sempre seguros e acessíveis de qualquer lugar.
 
-## 🚀 Principais Funcionalidades
+## 🚀 O que há de novo (v2.0 - Firebase Edition)
+
+- **☁️ Sincronização em Nuvem:** Seus dados não ficam mais presos ao navegador. Tudo é persistido em tempo real no **Firebase Firestore**.
+- **🛡️ Autenticação Segura:** Sistema de login e cadastro completo via **Firebase Auth**, com persistência de sessão e recuperação de senha.
+- **📂 Gestão de Anexos:** Suporte para anexos em tarefas (limite de 1MB por arquivo no plano gratuito), salvos diretamente no banco de dados.
+- **⚡ Performance Assíncrona:** Toda a lógica do app foi migrada para operações assíncronas, garantindo uma interface fluida que nunca trava durante o salvamento.
+- **🔄 Arquitetura Modular:** Código refatorado em serviços (`authService`, `dbService`) e componentes modernos.
+
+## 🚀 Funcionalidades Principais
 
 - **Gerenciamento Dinâmico:** Crie, edite e organize projetos e colunas conforme sua metodologia de trabalho.
-- **✅ Subtarefas Interativas:** Adicione listas de verificação dentro de cada tarefa. Conclua subtarefas diretamente no cartão do Kanban sem abrir modais, com barra de progresso em tempo real.
-- **📋 Vista em Lista (List View):** Alterne entre o quadro Kanban e uma tabela plana (estilo Asana/Excel) para uma visão macro de todas as tarefas.
-- **🎨 Cores Personalizadas:** Escolha cores específicas para cada projeto na sidebar para uma organização visual mais intuitiva.
-- **⚡ Ações em Massa (Bulk Operations):** Selecione múltiplas tarefas simultaneamente para:
-  - **Mover para Coluna:** Transfira várias tarefas de uma só vez para qualquer coluna existente.
-  - **Seleção Inteligente:** Selecione tudo ou todas as tarefas de um status específico com um clique.
-  - **Arquivamento e Exclusão:** Limpe seu quadro rapidamente arquivando ou removendo itens em lote.
-- **🛡️ Auto-Cura de Dados:** Sistema inteligente que detecta IDs duplicados ou ausentes, normalizando o banco de dados local automaticamente para evitar perda de informações.
-- **💎 Interface Premium:** Modais customizados substituem os diálogos nativos do sistema (prompt/confirm), garantindo uma experiência fluida e integrada.
-- **📊 Relatórios Avançados:** Dashboard visual com KPIs (total, concluídas, taxa de conclusão, atrasadas), progresso por coluna, por projeto e ranking de responsáveis.
-- **🏷️ Cartões Detalhados:** Adicione prazo, etiquetas (tags) com cores customizáveis, responsáveis e descrições ricas.
-- **🔄 Gestão de Status Dinâmica:** Arraste e solte cartões (Drag & Drop) entre colunas ou altere rapidamente o status diretamente pelo card.
-- **🔔 Notificações & Feedback:** Sistema de alertas internos com opção de limpeza rápida para manter o foco.
-- **📁 Espaço Seguro:** Tarefas concluídas podem ser **Arquivadas**. Itens apagados vão para a **Reciclagem** por 7 dias antes da exclusão permanente.
-- **📲 Experiência Mobile:** Interface totalmente responsiva, otimizada para toques e visualização em telas pequenas.
-- **📥 Exportação e Importação:** Backup em JSON ou planilhas CSV compatíveis com o Asana (incluindo indicadores de status ativo/arquivado).
+- **✅ Subtarefas Interativas:** Adicione listas de verificação dentro de cada tarefa. Conclua subtarefas diretamente no cartão sem abrir modais.
+- **📋 Vista em Lista (List View):** Alterne entre o quadro Kanban e uma tabela plana para uma visão macro.
+- **🎨 Cores Personalizadas:** Escolha cores específicas para cada projeto para organização visual.
+- **⚡ Ações em Massa (Bulk Operations):** Selecione múltiplas tarefas para mover, arquivar ou excluir de uma só vez.
+- **💎 Interface Premium:** Modais customizados que substituem os diálogos nativos (prompt/confirm), garantindo uma experiência premium.
+- **📊 Relatórios Avançados:** Dashboard visual com KPIs, progresso por coluna e ranking de responsáveis.
+- **🔔 Notificações & Feedback:** Sistema de alertas internos para manter o fluxo de trabalho.
+- **📁 Ciclo de Vida de Tarefas:** Itens apagados vão para a **Reciclagem** e itens concluídos podem ser **Arquivadas**.
+- **📲 Experiência Mobile:** Totalmente responsiva e otimizada para dispositivos móveis.
 
 ## 🛠️ Tecnologias e Dependências
 
-- **Frontend Core:** HTML5, CSS3, e JavaScript ES6+ (Vanilla).
-- **Design System:** [Tailwind CSS](https://tailwindcss.com/) via CDN para estilização rápida e responsiva.
-- **Ícones Ativos:** [Lucide Icons](https://lucide.dev/) com otimização de renderização por escopo.
-- **Drag & Drop:** [SortableJS](https://sortablejs.github.io/Sortable/) com gerenciamento de instâncias para evitar leaks de memória.
-- **Leitura de Dados (XLSX/CSV):** [SheetJS](https://sheetjs.com/) para importação inteligente de dados externos.
-- **Armazenamento Local:** Uso otimizado de `localStorage` para persistência offline.
+- **Core:** HTML5, CSS3, e JavaScript ES6+ (Módulos).
+- **Backend-as-a-Service:** [Firebase](https://firebase.google.com/) (Auth & Firestore).
+- **Design:** [Tailwind CSS](https://tailwindcss.com/) via CDN.
+- **Ícones:** [Lucide Icons](https://lucide.dev/).
+- **Drag & Drop:** [SortableJS](https://sortablejs.github.io/Sortable/).
+- **Parsing de Dados:** [SheetJS](https://sheetjs.com/).
 
 ## 📂 Estrutura de Diretórios
 
-O projeto foi organizado de forma escalável e modular:
-
 ```text
 kanbada/
-├── .gitignore                   # Arquivos ignorados pelo Git
-├── README.md                    # Documentação do projeto
-├── index.html                   # Página principal e templates UI
+├── index.html                   # Página principal (Single Page App)
 └── src/
     ├── styles/
-    │   └── style.css            # Design system, animações e tokens
+    │   └── style.css            # Design system e animações
     ├── components/
-    │   ├── Card.js              # Componente de renderização dos cartões
-    │   ├── Column.js            # Lógica de renderização de colunas
-    │   └── Login.js             # Sistema de autenticação e segurança
+    │   ├── Card.js              # Renderização dos cartões (UI)
+    │   ├── Column.js            # Estrutura das colunas
+    │   └── Login.js             # UI de Autenticação Firebase
     ├── services/
-    │   └── data_mapper.js       # Tratamento de dados e importadores
-    └── app.js                   # Lógica central e gerenciamento de estado
+    │   ├── firebase.js          # Configuração do SDK Firebase
+    │   ├── auth.service.js      # Lógica de Login/Cadastro
+    │   └── db.service.js        # Operações CRUD no Firestore
+    └── app.js                   # Lógica central e Gerenciamento de Estado
 ```
 
-## 🎮 Como Executar (Localmente)
+## 🎮 Como Executar
 
-Por ser baseado em Vanilla JavaScript e focado no cliente, o Kanbada é leve e fácil de rodar:
+### Pré-requisitos
+1. Um projeto configurado no [Firebase Console](https://console.firebase.google.com/).
+2. Ativar **Authentication** (E-mail/Senha) e **Cloud Firestore**.
 
-1. **Clone o repositório:**
-   ```bash
-   git clone https://github.com/acaciomiranda/kanbada.git
+### Configuração
+1. Edite o arquivo `src/services/firebase.js` com as suas chaves do Firebase:
+   ```javascript
+   const firebaseConfig = {
+       apiKey: "SUA_API_KEY",
+       authDomain: "SEU_DOMINIO.firebaseapp.com",
+       projectId: "SEU_PROJECT_ID",
+       // ... outras chaves
+   };
    ```
-
-2. **Inicie um servidor local:**
-   * *Com VS Code:* Utilize a extensão **Live Server**.
-   * *Com Node.js:* `npx serve .`
-   * *Com Python:* `python -m http.server`
-
-3. Acesse via `http://localhost:3000` ou no endereço da porta informada.
+2. Abra o `index.html` em um servidor local (Live Server ou similar).
 
 ## 🤝 Contribuindo
 
-Se você tiver alguma ideia ou encontrar algum erro, sinta-se à vontade para enviar um Pull Request. Melhorias sugeridas:
-- Sincronização em nuvem (Firebase/Supabase).
-- Upload real de arquivos para S3 ou Cloudinary.
-- Temas customizáveis além do Dark Mode.
+Se você tiver alguma ideia ou encontrar algum erro, sinta-se à vontade para enviar um Pull Request.
 
 ---
-Feito com dedicação para gerenciar suas tarefas da melhor forma possível! 🎯
+Feito com dedicação para gerenciar suas tarefas na nuvem! 🎯
