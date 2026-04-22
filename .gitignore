@@ -1,0 +1,6 @@
+node_modules/
+.env
+.DS_Store
+*.log
+Dois_Cliques_.xlsx
+kanbada_analise_melhorias.md

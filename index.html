@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="pt-BR" class="h-full">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Kanbada - Gestão de tarefas estilo Kanban inspirado no Asana">
+    <title>Kanbada - Gestão de Tarefas</title>
+
+    <!-- CSS e Bibliotecas Externas -->
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="src/styles/style.css">
+
+    <style>
+        body {
+            font-family: 'DM Sans', sans-serif;
+        }
+    </style>
+</head>
+
+<body class="h-full overflow-hidden" style="background:#12121f;color:#e0e0ec">
+    <!-- Screen Roots -->
+    <div id="login-root"></div>
+
+    <div id="app" class="flex h-full w-full hidden">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="flex-shrink-0 flex flex-col"
+            style="width:240px;background:#16162a;border-right:1px solid #2a2a44">
+            <!-- Logo -->
+            <div class="p-5 flex items-center gap-3">
+                <div style="width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#FF6B8A,#FF8E53)"
+                    class="flex items-center justify-center">
+                    <i data-lucide="layers" style="width:18px;height:18px;color:#fff"></i>
+                </div>
+                <span id="sidebar-title" class="font-bold text-base" style="color:#fff">Kanbada</span>
+            </div>
+
+            <!-- Navegação -->
+            <nav class="flex-1 px-3 space-y-1">
+                <div id="nav-home"
+                    class="sidebar-item active flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer">
+                    <i data-lucide="home" style="width:18px;height:18px;color:#9090b0"></i>
+                    <span style="color:#d0d0e4;font-size:14px">Página Inicial</span>
+                </div>
+
+                <div id="nav-my-tasks" class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer">
+                    <i data-lucide="check-circle" style="width:18px;height:18px;color:#9090b0"></i>
+                    <span style="color:#d0d0e4;font-size:14px">Minhas Tarefas</span>
+                </div>
+
+                <div id="nav-reports" class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer">
+                    <i data-lucide="bar-chart-2" style="width:18px;height:18px;color:#9090b0"></i>
+                    <span style="color:#d0d0e4;font-size:14px">Relatórios</span>
+                </div>
+
+                <div id="nav-archive" class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer">
+                    <i data-lucide="archive" style="width:18px;height:18px;color:#9090b0"></i>
+                    <span style="color:#d0d0e4;font-size:14px">Arquivo</span>
+                </div>
+
+                <div id="nav-recycle"
+                    class="sidebar-item flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer text-red-400 hover:bg-red-900/20">
+                    <i data-lucide="trash-2" style="width:18px;height:18px;color:currentColor"></i>
+                    <span style="font-size:14px;color:currentColor">Reciclagem</span>
+                </div>
+
+                <!-- Projetos -->
+                <div class="mt-6 pt-4" style="border-top:1px solid #2a2a44">
+                    <div class="flex items-center justify-between px-3 mb-2">
+                        <p class="text-xs font-semibold tracking-wider" style="color:#6a6a8e">PROJETOS</p>
+                        <button onclick="window.promptNewProject()"
+                            class="text-[#9090b0] hover:text-[#FF6B8A] transition-colors" title="Novo Projeto">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+
+                    <div id="project-list-sidebar">
+                        <!-- Projetos renderizados dinamicamente aqui -->
+                    </div>
+                </div>
+            </nav>
+
+            <!-- User Profile -->
+            <div class="p-4" style="border-top:1px solid #2a2a44">
+                <div class="flex items-center gap-3">
+                    <div class="avatar-user avatar w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white cursor-pointer"
+                        style="background:linear-gradient(135deg,#FF6B8A,#c850c0)" onclick="window.logout()"
+                        title="Clique para sair">
+                        U
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p id="user-display-name" style="font-size:13px;color:#e0e0ec;font-weight:500" class="truncate">
+                            Usuário</p>
+                        <p id="user-display-role" style="font-size:11px;color:#7a7a9e">Membro do Time</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col h-full overflow-hidden">
+            <!-- Header -->
+            <header class="flex items-center justify-between px-6 py-3 flex-shrink-0"
+                style="border-bottom:1px solid #2a2a44;background:#16162a">
+                <div class="flex items-center gap-3">
+                    <h1 id="board-title" class="font-bold text-lg" style="color:#fff">Quadro de Tarefas</h1>
+
+                    <!-- Botões de Importação -->
+                    <button onclick="window.triggerImport()"
+                        class="px-3 py-1.5 rounded-lg flex items-center gap-2 text-[11px] font-bold transition-all active:scale-95"
+                        style="background:rgba(255,107,138,0.1); border:1px solid rgba(255,107,138,0.2); color:#FF6B8A"
+                        title="Importar arquivo Excel ou CSV do Asana">
+                        <i data-lucide="file-up" class="w-3.5 h-3.5"></i> Importar Arquivo
+                    </button>
+
+                    <button onclick="window.importGoogleSheets()"
+                        class="px-3 py-1.5 rounded-lg flex items-center gap-2 text-[11px] font-bold transition-all active:scale-95"
+                        style="background:rgba(108,99,255,0.1); border:1px solid rgba(108,99,255,0.2); color:#6C63FF"
+                        title="Importar de uma planilha pública do Google Sheets">
+                        <i data-lucide="link" class="w-3.5 h-3.5"></i> Google Sheets
+                    </button>
+
+                    <button onclick="window.exportTasks()"
+                        class="px-3 py-1.5 rounded-lg flex items-center gap-2 text-[11px] font-bold transition-all active:scale-95"
+                        style="background:rgba(0,201,167,0.1); border:1px solid rgba(0,201,167,0.2); color:#00C9A7"
+                        title="Exportar backup das tarefas (Ctrl+E)">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i> Exportar
+                    </button>
+
+                    <input type="file" id="asana-import-input" accept=".xlsx,.xls,.csv" class="hidden"
+                        onchange="window.handleAsanaImport(event)">
+                </div>
+
+                <!-- Busca -->
+                <div class="flex-1 max-w-md mx-4 relative">
+                    <div class="relative">
+                        <i data-lucide="search"
+                            style="width:16px;height:16px;color:#6a6a8e;position:absolute;left:12px;top:50%;transform:translateY(-50%)"></i>
+                        <input type="text" id="search-input" placeholder="Buscar tarefas... (Ctrl+K)"
+                            class="w-full py-2 pl-10 pr-4 rounded-lg text-sm outline-none"
+                            style="background:#1e1e36;border:1px solid #2a2a44;color:#e0e0ec">
+                    </div>
+                    <div id="filter-indicator"
+                        class="hidden absolute top-full left-0 right-0 py-1 bg-[#16162a]/90 backdrop-blur z-10 text-center mt-1 rounded-lg">
+                        <button onclick="window.clearFilters()"
+                            class="text-[10px] text-[#FF6B8A] hover:underline flex items-center justify-center gap-1 mx-auto">
+                            <i data-lucide="x" class="w-2.5 h-2.5"></i> Limpar Filtros Ativos
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Notificações e Avatar -->
+                <div class="flex items-center gap-4">
+                    <div class="relative">
+                        <button id="noti-bell" class="relative hover:bg-white/5 p-2 rounded-lg transition-colors"
+                            style="color:#9090b0" title="Notificações">
+                            <i data-lucide="bell" style="width:20px;height:20px"></i>
+                            <span id="noti-badge" class="hidden"
+                                style="position:absolute;top:6px;right:6px;width:8px;height:8px;background:#FF6B8A;border-radius:50%;border:2px solid #16162a"></span>
+                        </button>
+
+                        <!-- Dropdown Notificações -->
+                        <div id="notification-dropdown"
+                            class="absolute right-0 mt-2 w-64 bg-[#1e1e36] rounded-xl overflow-hidden hidden z-50">
+                            <div class="p-3 border-b border-[#2a2a44] bg-[#2a2a44]/30">
+                                <h4 class="text-xs font-bold text-white">Notificações</h4>
+                            </div>
+                            <div id="noti-list" class="max-h-64 overflow-y-auto"></div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Kanban Board -->
+            <div class="flex-1 overflow-auto p-6 flex items-start gap-6 h-full">
+                <div id="kanban-board-container" class="kanban-board flex gap-6 h-full">
+                    <!-- Colunas renderizadas dinamicamente aqui -->
+                </div>
+
+                <!-- Botão Nova Coluna -->
+                <button id="add-col-btn" onclick="window.promptNewColumn()"
+                    class="flex-shrink-0 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-[#2a2a44] text-[#9090b0] hover:border-[#FF6B8A] hover:text-[#FF6B8A] transition-colors mt-[48px]"
+                    style="width:320px;">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span class="font-bold text-sm">Adicionar Coluna</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Nova/Editar Tarefa -->
+    <div id="modal-overlay" class="modal-overlay fixed inset-0 z-50 flex items-center justify-center hidden">
+        <div style="background:#1e1e36;border:1px solid #2a2a44;border-radius:16px;width:400px;max-width:90%"
+            class="p-6">
+            <div class="flex items-center justify-between mb-5">
+                <h2 id="modal-title" class="font-bold text-base" style="color:#fff">Nova Tarefa</h2>
+                <button onclick="window.closeModal()" style="color:#9090b0" title="Fechar (ESC)">
+                    <i data-lucide="x" style="width:20px;height:20px"></i>
+                </button>
+            </div>
+
+            <form id="task-form" class="space-y-4" onsubmit="window.handleSubmit(event)">
+                <div>
+                    <label class="block text-xs font-medium mb-1" style="color:#9090b0" for="f-title">Título da Tarefa
+                        *</label>
+                    <input id="f-title" required class="w-full py-2 px-3 rounded-lg text-sm outline-none"
+                        style="background:#12121f;border:1px solid #2a2a44;color:#e0e0ec"
+                        placeholder="Digite o título da tarefa" maxlength="100">
+                </div>
+
+                <div class="flex gap-3">
+                    <div class="flex-1">
+                        <label class="block text-xs font-medium mb-1" style="color:#9090b0" for="f-date">Data de
+                            Entrega</label>
+                        <input id="f-date" type="date" class="w-full py-2 px-3 rounded-lg text-sm outline-none"
+                            style="background:#12121f;border:1px solid #2a2a44;color:#e0e0ec">
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-xs font-medium mb-1" style="color:#9090b0"
+                            for="f-assignee">Responsável</label>
+                        <input id="f-assignee" class="w-full py-2 px-3 rounded-lg text-sm outline-none"
+                            style="background:#12121f;border:1px solid #2a2a44;color:#e0e0ec" placeholder="Nome">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium mb-1" style="color:#9090b0" for="f-description">Descrição da Tarefa</label>
+                    <textarea id="f-description" class="w-full py-2 px-3 rounded-lg text-sm outline-none resize-none"
+                        style="background:#12121f;border:1px solid #2a2a44;color:#e0e0ec" rows="3"
+                        placeholder="Detalhes adicionais da tarefa..."></textarea>
+                </div>
+
+                <div class="flex gap-3">
+                    <div class="flex-1">
+                        <label class="block text-xs font-medium mb-1" style="color:#9090b0"
+                            for="f-project">Projeto</label>
+                        <select id="f-project" class="w-full py-2 px-3 rounded-lg text-sm outline-none"
+                            style="background:#12121f;border:1px solid #2a2a44;color:#e0e0ec">
+                            <option value="">Geral</option>
+                            <!-- Opções preenchidas dinamicamente -->
+                        </select>
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-xs font-medium mb-1" style="color:#9090b0" for="f-tag">Etiqueta (Tag)</label>
+                        <input id="f-tag" class="w-full py-2 px-3 rounded-lg text-sm outline-none"
+                            style="background:#12121f;border:1px solid #2a2a44;color:#e0e0ec" placeholder="Ex: Urgente">
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-xs font-medium mb-1" style="color:#9090b0" for="f-tagcolor">Cor da
+                            Tag</label>
+                        <select id="f-tagcolor" class="w-full py-2 px-3 rounded-lg text-sm outline-none"
+                            style="background:#12121f;border:1px solid #2a2a44;color:#e0e0ec">
+                            <option value="#FF6B8A">Rosa</option>
+                            <option value="#6C63FF">Roxo</option>
+                            <option value="#00C9A7">Verde</option>
+                            <option value="#FFB84D">Laranja</option>
+                            <option value="#4DA8FF">Azul</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex gap-3 items-center">
+                    <div class="flex-1">
+                        <label class="block text-xs font-medium mb-1" style="color:#9090b0" for="f-status">Status (Coluna)</label>
+                        <select id="f-status" class="w-full py-2 px-3 rounded-lg text-sm outline-none"
+                            style="background:#12121f;border:1px solid #2a2a44;color:#e0e0ec">
+                            <!-- Preenchido dinamicamente no JS -->
+                        </select>
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-xs font-medium mb-1" style="color:#9090b0" for="f-file">Anexo (Max 1GB)</label>
+                        <input type="file" id="f-file" class="w-full text-xs" style="color:#e0e0ec" onchange="window.validateFileSize(this)">
+                        <input type="hidden" id="f-filename">
+                    </div>
+                </div>
+
+                <div id="form-error" class="text-xs hidden p-2 rounded-lg"
+                    style="color:#FF6B8A;background:rgba(255,107,138,0.1);border:1px solid rgba(255,107,138,0.2)"></div>
+
+                <button id="submit-btn" type="submit"
+                    class="w-full py-2.5 rounded-lg font-semibold text-sm transition-all active:scale-95"
+                    style="background:linear-gradient(135deg,#FF6B8A,#FF8E53);color:#fff">
+                    Adicionar Tarefa
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Conflito de Importação -->
+    <div id="import-modal" class="modal-overlay fixed inset-0 z-[60] flex items-center justify-center hidden">
+        <div style="background:#1e1e36;border:1px solid #2a2a44;border-radius:16px;width:400px;max-width:90%"
+            class="p-6">
+            <h2 class="font-bold text-base text-white mb-3">Conflito de Tarefas Detectado</h2>
+            <p id="import-modal-msg" class="text-xs text-gray-400 mb-6 leading-relaxed"></p>
+            <div class="flex flex-col gap-2">
+                <button onclick="window.confirmImport('replace')"
+                    class="w-full py-2.5 bg-[#FF6B8A] text-white text-xs font-bold rounded-lg hover:opacity-90 transition-all active:scale-95">
+                    Substituir Existentes
+                </button>
+                <button onclick="window.confirmImport('copy')"
+                    class="w-full py-2.5 bg-white/5 text-gray-300 text-xs font-bold rounded-lg hover:bg-white/10 transition-all active:scale-95">
+                    Criar Cópias (Duplicar)
+                </button>
+                <button onclick="window.confirmImport('cancel')"
+                    class="w-full py-2.5 bg-transparent text-gray-500 text-xs font-bold rounded-lg border border-[#2a2a44] hover:border-gray-500 transition-all active:scale-95">
+                    Cancelar Importação
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast de Notificação -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 hidden px-4 py-3 rounded-lg text-sm font-medium shadow-2xl"
+        style="background:#2a2a44;color:#e0e0ec"></div>
+
+    <!-- Scripts (ORDEM CORRETA) -->
+    <script src="src/services/data_mapper.js"></script>
+    <script src="src/components/Card.js"></script>
+    <script src="src/components/Column.js"></script>
+    <script src="src/components/Login.js"></script>
+    <script src="src/app.js"></script>
+</body>
+
+</html>
