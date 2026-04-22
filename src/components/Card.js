@@ -134,14 +134,18 @@ window.createTaskCard = function(task, deletingId = null, toggleDelete = () => {
             <h3 class="font-semibold text-[14px] leading-tight group-hover:text-[#FF6B8A] transition-colors line-clamp-2">${title}</h3>
             
             ${description ? `
-                <p class="text-xs text-gray-400 line-clamp-2 mt-1 leading-snug">${description}</p>
+                <p class="text-xs text-gray-400 line-clamp-4 mt-1 leading-relaxed">${description}</p>
             ` : ''}
             
             <!-- Select Status / Reações -->
             <div class="flex items-center justify-between mt-1 gap-2">
-                <select onchange="window.changeTaskStatus('${id}', this.value, event)" class="bg-[#12121f] border border-[#2a2a44] text-[#9090b0] text-[10px] rounded px-1 py-0.5 outline-none hover:border-[#FF6B8A] transition-colors" onclick="event.stopPropagation()">
-                    ${window.allColumns ? window.allColumns.map(col => `<option value="${col.id}" ${col.id === task.status ? 'selected' : ''}>${col.title}</option>`).join('') : ''}
-                </select>
+                <div class="flex-1">
+                    <select onchange="window.changeTaskStatus('${id}', this.value, event)" 
+                        class="w-full bg-[#12121f] border border-[#2a2a44] text-[#9090b0] text-[10px] rounded px-2 py-1 outline-none hover:border-[#FF6B8A] focus:border-[#FF6B8A] transition-colors cursor-pointer" 
+                        onclick="event.stopPropagation()">
+                        ${(window.allColumns || []).map(col => `<option value="${col.id}" ${col.id === task.status ? 'selected' : ''}>${col.title}</option>`).join('')}
+                    </select>
+                </div>
                 
                 <div class="flex items-center gap-1.5">
                     <button onclick="window.reactToTask('${id}', 'thumbsUp', event)" class="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-white/5 text-[10px] text-gray-400 hover:text-yellow-400 transition-colors">
@@ -163,10 +167,12 @@ window.createTaskCard = function(task, deletingId = null, toggleDelete = () => {
                         </div>
                     ` : ''}
                     ${filename ? `
-                        <div class="flex items-center gap-1 text-[11px] text-gray-400 truncate max-w-[80px]" title="${filename}">
-                            <i data-lucide="paperclip" class="w-3.5 h-3.5 flex-shrink-0"></i>
+                        <button onclick="window.downloadAttachment('${id}')" 
+                            class="flex items-center gap-1 text-[11px] text-gray-400 hover:text-[#4DA8FF] transition-colors truncate max-w-[100px]" 
+                            title="Baixar: ${filename}">
+                            <i data-lucide="download" class="w-3.5 h-3.5 flex-shrink-0"></i>
                             <span class="truncate">${filename}</span>
-                        </div>
+                        </button>
                     ` : task.has_attachment ? `
                         <div class="flex items-center gap-1 text-[11px] text-gray-400" title="Com anexo">
                             <i data-lucide="paperclip" class="w-3.5 h-3.5"></i>

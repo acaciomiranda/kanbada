@@ -26,7 +26,7 @@ const defaultConfig = {
     background_color: '#12121f',
     surface_color: '#1e1e36',
     text_color: '#e0e0ec',
-    board_title: 'Quadro Kanban',
+    board_title: 'Quadro de Tarefas',
     col_plan: 'Plano',
     col_progress: 'Em Andamento',
     col_done: 'Concluído'
@@ -627,14 +627,14 @@ function initSidebarListeners() {
     document.getElementById('nav-home').addEventListener('click', () => {
         viewMode = 'board';
         const bt = document.getElementById('board-title');
-        if (bt) bt.textContent = 'Quadro Kanban';
+        if (bt) bt.textContent = 'Quadro de Tarefas';
         window.clearFilters();
     });
     
     document.getElementById('nav-my-tasks').addEventListener('click', (e) => {
         viewMode = 'board';
         const bt = document.getElementById('board-title');
-        if (bt) bt.textContent = 'Quadro Kanban';
+        if (bt) bt.textContent = 'Quadro de Tarefas';
         document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
         e.currentTarget.classList.add('active');
         showOnlyMyTasks = true;
@@ -788,11 +788,39 @@ window.validateFileSize = function(input) {
             alert('Erro: O arquivo selecionado ultrapassa o limite de 1GB.');
             input.value = '';
             document.getElementById('f-filename').value = '';
+            document.getElementById('task-form').dataset.fileData = '';
         } else {
             document.getElementById('f-filename').value = file.name;
+            
+            // Tenta ler o arquivo para persistência (apenas se for pequeno, < 5MB para localStorage)
+            if (file.size < 5 * 1024 * 1024) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('task-form').dataset.fileData = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            } else {
+                document.getElementById('task-form').dataset.fileData = ''; // Muito grande para localStorage
+                window.showToast('Arquivo muito grande para persistência offline completa. Apenas o nome será salvo.', 'default');
+            }
         }
     } else {
         document.getElementById('f-filename').value = '';
+        document.getElementById('task-form').dataset.fileData = '';
+    }
+};
+
+window.downloadAttachment = function(id) {
+    const task = allTasks.find(t => t.__backendId.toString() === id.toString());
+    if (!task || !task.filename) return;
+    
+    if (task.fileData) {
+        const a = document.createElement('a');
+        a.href = task.fileData;
+        a.download = task.filename;
+        a.click();
+    } else {
+        alert('Este arquivo é apenas uma referência nominal (maior que o limite do navegador para armazenamento offline).');
     }
 };
 
@@ -820,6 +848,7 @@ window.handleSubmit = (e) => {
         tag_color: document.getElementById('f-tagcolor').value,
         has_attachment: !!document.getElementById('f-filename').value,
         filename: document.getElementById('f-filename').value,
+        fileData: document.getElementById('task-form').dataset.fileData || '',
         description: document.getElementById('f-description').value,
         status: document.getElementById('f-status').value
     };
