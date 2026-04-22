@@ -1,4 +1,4 @@
-import { db } from './firebase.js?v=4';
+import { db } from './firebase.js?v=5';
 import {
     doc, collection, getDocs, setDoc, updateDoc,
     deleteDoc, onSnapshot, writeBatch, serverTimestamp
