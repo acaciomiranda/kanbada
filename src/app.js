@@ -838,7 +838,7 @@ window.validateFileSize = function(input) {
         const file = input.files[0];
         const maxSize = 1024 * 1024 * 1024; // 1GB
         if (file.size > maxSize) {
-            alert('Erro: O arquivo selecionado ultrapassa o limite de 1GB.');
+            window.showToast('Erro: O arquivo selecionado ultrapassa o limite de 1GB.', 'error');
             input.value = '';
             document.getElementById('f-filename').value = '';
             document.getElementById('task-form').dataset.fileData = '';
@@ -873,7 +873,7 @@ window.downloadAttachment = function(id) {
         a.download = task.filename;
         a.click();
     } else {
-        alert('Este arquivo é apenas uma referência nominal (maior que o limite do navegador para armazenamento offline).');
+        window.showToast('Este arquivo é apenas uma referência nominal (limite de armazenamento excedido).', 'default');
     }
 };
 
@@ -897,7 +897,7 @@ window.handleSubmit = (e) => {
         due_date: document.getElementById('f-date').value || null,
         assignee: document.getElementById('f-assignee').value.trim() || 'Usuário',
         project: document.getElementById('f-project').value || 'Geral',
-        tag: document.getElementById('f-tag').value.trim() || 'Tarefa',
+        tag: document.getElementById('f-tag').value.trim() || '',
         tag_color: document.getElementById('f-tagcolor').value,
         has_attachment: !!document.getElementById('f-filename').value,
         filename: document.getElementById('f-filename').value,
@@ -1037,10 +1037,10 @@ function updateProjectSelects() {
     statusSelects.forEach(s => s.innerHTML = statusOptionsHtml);
 }
 
-window.promptEditColumn = function(id) {
+window.promptEditColumn = async function(id) {
     const col = allColumns.find(c => c.id === id);
     if (!col) return;
-    const newName = prompt('Novo nome para a coluna:', col.title);
+    const newName = await window.customPrompt('Editar Coluna', 'Digite o novo nome para a coluna:', col.title);
     if (newName && newName.trim()) {
         col.title = newName.trim();
         saveConfig();
@@ -1049,26 +1049,25 @@ window.promptEditColumn = function(id) {
     }
 };
 
-window.promptDeleteColumn = function(id) {
+window.promptDeleteColumn = async function(id) {
     const col = allColumns.find(c => c.id === id);
     if (!col) return;
     
+    let msg = `Deseja realmente excluir a coluna "${col.title}"?`;
     if (allTasks.some(t => t.status === id && !t.deleted)) {
-        if (!confirm('Atenção: Existem tarefas ativas nesta coluna! Elas ficarão órfãs e não aparecerão no quadro até atribuí-las a outra. Deseja excluir mesmo assim?')) {
-            return;
-        }
-    } else {
-        if (!confirm(`Deseja realmente excluir a coluna "${col.title}"?`)) return;
+        msg = `Atenção: Existem tarefas ativas na coluna "${col.title}"! Elas ficarão órfãs. Deseja excluir mesmo assim?`;
     }
-    
-    allColumns = allColumns.filter(c => c.id !== id);
-    saveConfig();
-    window.renderBoard(allTasks);
-    window.showToast('Coluna excluída!');
+
+    if (await window.customConfirm('Excluir Coluna', msg, true)) {
+        allColumns = allColumns.filter(c => c.id !== id);
+        saveConfig();
+        window.renderBoard(allTasks);
+        window.showToast('Coluna excluída!');
+    }
 };
 
-window.promptNewProject = function() {
-    const name = prompt('Nome do novo projeto:');
+window.promptNewProject = async function() {
+    const name = await window.customPrompt('Novo Projeto', 'Digite o nome do projeto:');
     if (name && name.trim()) {
         const trimmed = name.trim();
         if (!allProjects.includes(trimmed)) {
@@ -1081,8 +1080,8 @@ window.promptNewProject = function() {
     }
 };
 
-window.promptNewColumn = function() {
-    const title = prompt('Nome da nova coluna:');
+window.promptNewColumn = async function() {
+    const title = await window.customPrompt('Nova Coluna', 'Digite o nome da coluna:');
     if (title && title.trim()) {
         const trimmed = title.trim();
         const id = 'col_' + Date.now();
@@ -1410,8 +1409,8 @@ window.exportTasksCSV = function() {
         return;
     }
 
-    // Cabeçalho compatível com Asana
-    const headers = ['Name', 'Section/Column', 'Assignee', 'Due Date', 'Project', 'Notes', 'Tags'];
+    // Cabeçalho compatível com Asana + Status
+    const headers = ['Name', 'Section/Column', 'Status', 'Assignee', 'Due Date', 'Project', 'Notes', 'Tags'];
     const colTitle = (id) => {
         const col = allColumns.find(c => c.id === id);
         return col ? col.title : id;
@@ -1420,6 +1419,7 @@ window.exportTasksCSV = function() {
     const rows = activeTasks.map(t => [
         (t.title || '').replace(/,/g, ';'),
         colTitle(t.status),
+        t.archived ? 'Arquivada' : 'Ativa',
         (t.assignee || '').replace(/,/g, ';'),
         t.due_date || '',
         (t.project || 'Geral').replace(/,/g, ';'),
@@ -1438,4 +1438,57 @@ window.exportTasksCSV = function() {
     URL.revokeObjectURL(url);
 
     window.showToast(`${activeTasks.length} tarefas exportadas em CSV!`);
+};
+
+// --- MODAL DE PROMPT/CONFIRM CUSTOMIZADO ---
+window.customPrompt = function(title, message, defaultValue = '', options = {}) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('prompt-modal');
+        const container = document.getElementById('prompt-modal-container');
+        const titleEl = document.getElementById('prompt-modal-title');
+        const msgEl = document.getElementById('prompt-modal-message');
+        const input = document.getElementById('prompt-modal-input');
+        const cancelBtn = document.getElementById('prompt-modal-cancel');
+        const confirmBtn = document.getElementById('prompt-modal-confirm');
+        const inputWrapper = document.getElementById('prompt-input-wrapper');
+        const iconContainer = document.getElementById('prompt-icon-container');
+
+        titleEl.textContent = title;
+        msgEl.textContent = message;
+        input.value = defaultValue;
+        inputWrapper.classList.toggle('hidden', options.noInput);
+        
+        if (options.isDelete) {
+            confirmBtn.className = "px-6 py-2 bg-[#FF6B8A] hover:bg-pink-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-pink-500/20 transition-all active:scale-95";
+            iconContainer.className = "p-2 rounded-lg bg-[#FF6B8A]/10 text-[#FF6B8A]";
+            iconContainer.innerHTML = '<i data-lucide="trash-2" class="w-5 h-5"></i>';
+        } else {
+            confirmBtn.className = "px-6 py-2 bg-[#6C63FF] hover:bg-indigo-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-500/20 transition-all active:scale-95";
+            iconContainer.className = "p-2 rounded-lg bg-[#6C63FF]/10 text-[#6C63FF]";
+            iconContainer.innerHTML = '<i data-lucide="help-circle" class="w-5 h-5"></i>';
+        }
+
+        if (window.lucide) window.lucide.createIcons({ scope: iconContainer });
+
+        modal.classList.remove('hidden');
+        setTimeout(() => container.classList.remove('scale-95'), 10);
+        input.focus();
+
+        const close = (val) => {
+            container.classList.add('scale-95');
+            setTimeout(() => modal.classList.add('hidden'), 200);
+            resolve(val);
+        };
+
+        confirmBtn.onclick = () => close(options.noInput ? true : input.value);
+        cancelBtn.onclick = () => close(null);
+        input.onkeydown = (e) => {
+            if (e.key === 'Enter') confirmBtn.click();
+            if (e.key === 'Escape') cancelBtn.click();
+        };
+    });
+};
+
+window.customConfirm = (title, message, isDelete = false) => {
+    return window.customPrompt(title, message, '', { noInput: true, isDelete });
 };

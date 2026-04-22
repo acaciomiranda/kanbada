@@ -240,20 +240,28 @@ async function handleRegisterFlow(email, password, errorDiv) {
     if (window.onLoginSuccess) window.onLoginSuccess(sessionUser);
 }
 
-window.forgotPassword = function() {
-    const emailInput = prompt('Digite o email cadastrado para redefinir a senha:');
+window.forgotPassword = async function() {
+    const emailInput = await window.customPrompt('Recuperar Senha', 'Digite o email cadastrado:');
     if (!emailInput) return;
     const email = emailInput.trim().toLowerCase();
     const users = getUsers();
-    if (!users[email]) { alert('Email não encontrado.'); return; }
-    if (!confirm(`Redefinir senha para "${email}"?\n\nSuas tarefas serão mantidas.`)) return;
-    const newPass = prompt('Digite a nova senha (mínimo 6 caracteres):');
-    if (!newPass || newPass.length < 6) { alert('Senha inválida. Operação cancelada.'); return; }
-    hashPassword(newPass).then(hash => {
-        users[email].passwordHash = hash;
-        saveUsers(users);
-        alert('Senha redefinida com sucesso! Faça o login.');
-    });
+    if (!users[email]) {
+        window.showToast('Email não encontrado.', 'error');
+        return;
+    }
+    
+    if (!(await window.customConfirm('Redefinir Senha', `Deseja realmente redefinir a senha para "${email}"? Suas tarefas serão mantidas.`))) return;
+    
+    const newPass = await window.customPrompt('Nova Senha', 'Digite a nova senha (mínimo 6 caracteres):');
+    if (!newPass || newPass.length < 6) {
+        window.showToast('Senha inválida. Operação cancelada.', 'error');
+        return;
+    }
+    
+    const hash = await hashPassword(newPass);
+    users[email].passwordHash = hash;
+    saveUsers(users);
+    window.showToast('Senha redefinida com sucesso! Faça o login.');
 };
 
 function showAuthError(errorDiv, message) {
