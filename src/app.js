@@ -197,8 +197,9 @@ function updateAvatars() {
 }
 
 // --- LOGOUT ---
-window.logout = function() {
-    if (!confirm('Deseja realmente sair? Suas tarefas estão salvas.')) return;
+window.logout = async function() {
+    const confirmed = await window.customConfirm('Confirmar Saída', 'Deseja realmente sair? Suas tarefas estão salvas.', false);
+    if (!confirmed) return;
     localStorage.removeItem('kanbada_user');
     currentUser = null;
     hideApp();
@@ -362,8 +363,8 @@ function completeImport(tasks) {
 }
 
 // --- GOOGLE SHEETS IMPORT ---
-window.importGoogleSheets = function() {
-    const url = prompt('Cole o link público do Google Sheets:');
+window.importGoogleSheets = async function() {
+    const url = await window.customPrompt('Importar Google Sheets', 'Cole o link público da planilha:');
     if (!url) return;
     
     const sheetId = url.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
@@ -1270,43 +1271,6 @@ window.bulkDelete = function() {
     window.showToast('Tarefas excluídas com sucesso!');
 };
 
-window.bulkMoveToColumn = function(colId) {
-    if (window.selectedTaskIds.length === 0) return;
-    const col = allColumns.find(c => c.id === colId);
-    if (!col) return;
-
-    let moved = 0;
-    window.selectedTaskIds.forEach(id => {
-        const task = allTasks.find(t => t.__backendId.toString() === id.toString());
-        if (task && task.status !== colId) {
-            task.status = colId;
-            moved++;
-        }
-    });
-
-    window.selectedTaskIds = [];
-    saveTasks();
-    window.renderBoard(allTasks);
-    window.showToast(`${moved} tarefas movidas para "${col.title}"!`);
-};
-
-window.toggleTaskSelection = function(id, event) {
-    if (event) event.stopPropagation();
-    const idx = window.selectedTaskIds.indexOf(id);
-    if (idx > -1) {
-        window.selectedTaskIds.splice(idx, 1);
-    } else {
-        window.selectedTaskIds.push(id);
-    }
-    updateBulkBar();
-    // Renderização parcial apenas se necessário, mas renderBoard é mais seguro
-    window.renderBoard(allTasks); 
-};
-
-window.clearSelection = function() {
-    window.selectedTaskIds = [];
-    window.renderBoard(allTasks);
-};
 
 window.selectAll = function() {
     const visible = getVisibleTasks(allTasks);
@@ -1471,21 +1435,6 @@ function initSortable() {
     });
 }
 
-// --- TOAST ---
-window.showToast = function(msg, type = 'default') {
-    const t = document.getElementById('toast');
-    if (!t) return;
-    t.textContent = msg;
-    // Remove classes anteriores
-    t.classList.remove('toast-success', 'toast-error', 'toast-default', 'hidden');
-    t.classList.add('toast-' + type);
-    // Limpa style inline legado
-    t.style.background = '';
-
-    clearTimeout(t._toastTimer);
-    t._toastTimer = setTimeout(() => t.classList.add('hidden'), 3500);
-};
-
 // --- ATALHOS DE TECLADO ---
 function initKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
@@ -1612,9 +1561,9 @@ window.exportTasksCSV = function() {
 window.validateFileSize = function(input) {
     if (input.files && input.files[0]) {
         const file = input.files[0];
-        const maxSize = 1024 * 1024 * 1024; // 1GB
+        const maxSize = 500 * 1024 * 1024; // 500MB
         if (file.size > maxSize) {
-            window.showToast('Arquivo muito grande! Máximo 1GB.', 'error');
+            window.showToast('Arquivo muito grande! Máximo 500MB.', 'error');
             input.value = '';
             return;
         }
@@ -1623,12 +1572,36 @@ window.validateFileSize = function(input) {
 };
 
 window.downloadAttachment = function(id) {
-    window.showToast('Iniciando download...');
-    // Simulação de download para o MVP
-    setTimeout(() => {
-        window.showToast('Download concluído!');
-    }, 1000);
+    const task = allTasks.find(t => t.__backendId === id);
+    
+    if (!task || !task.fileData) {
+        window.showToast('⚠️ Anexos serão implementados em breve', 'error');
+        return;
+    }
+    
+    try {
+        const blob = base64ToBlob(task.fileData, task.fileMimeType || 'application/octet-stream');
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = task.filename || 'arquivo';
+        a.click();
+        URL.revokeObjectURL(url);
+        window.showToast('Download iniciado!');
+    } catch (e) {
+        console.error('Erro no download:', e);
+        window.showToast('Erro ao baixar anexo', 'error');
+    }
 };
+
+function base64ToBlob(base64, mimeType) {
+    const byteChars = atob(base64);
+    const byteArray = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) {
+        byteArray[i] = byteChars.charCodeAt(i);
+    }
+    return new Blob([byteArray], { type: mimeType });
+}
 
 window.customPrompt = function(title, message, defaultValue = '', options = {}) {
     return new Promise((resolve) => {
@@ -1681,20 +1654,3 @@ window.customPrompt = function(title, message, defaultValue = '', options = {}) 
 window.customConfirm = (title, message, isDelete = false) => {
     return window.customPrompt(title, message, '', { noInput: true, isDelete });
 };
-
-// --- DOM READY ---
-document.addEventListener('DOMContentLoaded', () => {
-    checkAuth();
-    initSidebarListeners();
-    initNotificationListeners();
-    initMobileSidebarClose();
-    
-    // Global Listeners
-    document.getElementById('task-form')?.addEventListener('submit', window.handleSubmit);
-    document.getElementById('search-input')?.addEventListener('input', (e) => {
-        searchTerm = e.target.value;
-        window.renderBoard(allTasks);
-    });
-
-    // Delegar cliques para botões de ação em massa (opcional, já estão nos onclicks)
-});
