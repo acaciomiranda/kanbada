@@ -1221,7 +1221,8 @@ function getVisibleTasks() {
 function updateBulkBar() {
     const bar = document.getElementById('bulk-actions-bar');
     const countSpan = document.getElementById('selected-count');
-    const dropdown = document.getElementById('bulk-status-dropdown');
+    const selectDropdown = document.getElementById('bulk-select-dropdown');
+    const moveDropdown = document.getElementById('bulk-move-dropdown');
 
     if (!bar || !countSpan) return;
 
@@ -1230,9 +1231,20 @@ function updateBulkBar() {
         const n = window.selectedTaskIds.length;
         countSpan.textContent = `${n} selecionada${n > 1 ? 's' : ''}`;
 
-        // Preenche dropdown "Mover para..." com as colunas reais
-        if (dropdown) {
-            dropdown.innerHTML = allColumns.map(col => `
+        // Preenche dropdown "Selecionar por Status"
+        if (selectDropdown) {
+            selectDropdown.innerHTML = allColumns.map(col => `
+                <button onclick="window.bulkSelectStatus('${col.id}')"
+                    class="w-full text-left px-4 py-2 text-[11px] text-gray-300 hover:bg-white/5 hover:text-[#FF6B8A] transition-colors flex items-center gap-2">
+                    <span style="width:6px;height:6px;border-radius:50%;background:${col.color};flex-shrink:0"></span>
+                    ${col.title}
+                </button>
+            `).join('');
+        }
+
+        // Preenche dropdown "Mover para..."
+        if (moveDropdown) {
+            moveDropdown.innerHTML = allColumns.map(col => `
                 <button onclick="window.bulkMoveToColumn('${col.id}')"
                     class="w-full text-left px-4 py-2 text-[11px] text-gray-300 hover:bg-white/5 hover:text-[#FF6B8A] transition-colors flex items-center gap-2">
                     <span style="width:6px;height:6px;border-radius:50%;background:${col.color};flex-shrink:0"></span>
