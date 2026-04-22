@@ -5,10 +5,14 @@
 ## 🚀 Principais Funcionalidades
 
 - **Gerenciamento Dinâmico:** Crie, edite e organize projetos e colunas conforme sua metodologia de trabalho.
+- **✅ Subtarefas Interativas:** Adicione listas de verificação dentro de cada tarefa. Conclua subtarefas diretamente no cartão do Kanban sem abrir modais, com barra de progresso em tempo real.
+- **📋 Vista em Lista (List View):** Alterne entre o quadro Kanban e uma tabela plana (estilo Asana/Excel) para uma visão macro de todas as tarefas.
+- **🎨 Cores Personalizadas:** Escolha cores específicas para cada projeto na sidebar para uma organização visual mais intuitiva.
 - **⚡ Ações em Massa (Bulk Operations):** Selecione múltiplas tarefas simultaneamente para:
   - **Mover para Coluna:** Transfira várias tarefas de uma só vez para qualquer coluna existente.
   - **Seleção Inteligente:** Selecione tudo ou todas as tarefas de um status específico com um clique.
   - **Arquivamento e Exclusão:** Limpe seu quadro rapidamente arquivando ou removendo itens em lote.
+- **🛡️ Auto-Cura de Dados:** Sistema inteligente que detecta IDs duplicados ou ausentes, normalizando o banco de dados local automaticamente para evitar perda de informações.
 - **💎 Interface Premium:** Modais customizados substituem os diálogos nativos do sistema (prompt/confirm), garantindo uma experiência fluida e integrada.
 - **📊 Relatórios Avançados:** Dashboard visual com KPIs (total, concluídas, taxa de conclusão, atrasadas), progresso por coluna, por projeto e ranking de responsáveis.
 - **🏷️ Cartões Detalhados:** Adicione prazo, etiquetas (tags) com cores customizáveis, responsáveis e descrições ricas.

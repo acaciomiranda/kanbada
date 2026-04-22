@@ -134,6 +134,20 @@
                         <i data-lucide="link" class="w-3.5 h-3.5"></i> Google Sheets
                     </button>
 
+                    <div class="h-6 w-[1px] bg-[#2a2a44] mx-2 hidden lg:block"></div>
+                    
+                    <!-- Alternar Visualização -->
+                    <div class="flex items-center bg-[#1e1e36] rounded-lg p-1 border border-[#2a2a44] mr-2">
+                        <button onclick="window.setViewMode('board')" id="view-board-btn" 
+                            class="p-1.5 rounded-md transition-all active:scale-95 text-[#FF6B8A] bg-[#FF6B8A]/10" title="Vista Kanban">
+                            <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                        </button>
+                        <button onclick="window.setViewMode('list')" id="view-list-btn" 
+                            class="p-1.5 rounded-md transition-all active:scale-95 text-[#9090b0] hover:text-white" title="Vista em Lista">
+                            <i data-lucide="list" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
                     <div class="flex items-center gap-1" id="export-group">
                         <button onclick="window.exportTasks()"
                             class="px-3 py-1.5 rounded-lg flex items-center gap-2 text-[11px] font-bold transition-all active:scale-95"
@@ -337,6 +351,25 @@
                         <label class="block text-xs font-medium mb-1" style="color:#9090b0" for="f-file">Anexo (Max 1GB)</label>
                         <input type="file" id="f-file" class="w-full text-xs" style="color:#e0e0ec" onchange="window.validateFileSize(this)">
                         <input type="hidden" id="f-filename">
+                    </div>
+                </div>
+
+                <!-- Subtarefas -->
+                <div class="pt-2 border-t border-[#2a2a44]">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="text-xs font-medium" style="color:#9090b0">Subtarefas</label>
+                        <span id="subtask-progress" class="text-[10px] text-[#FF6B8A] font-bold">0/0</span>
+                    </div>
+                    <div id="subtasks-container" class="space-y-2 max-h-32 overflow-y-auto pr-1">
+                        <!-- Lista de subtarefas -->
+                    </div>
+                    <div class="flex gap-2 mt-2">
+                        <input type="text" id="new-subtask-input" placeholder="Adicionar subtarefa..." 
+                            class="flex-1 bg-[#12121f] border border-[#2a2a44] rounded-lg px-3 py-1.5 text-xs text-[#e0e0ec] outline-none focus:border-[#FF6B8A]">
+                        <button type="button" onclick="window.addSubtask()" 
+                            class="p-1.5 bg-[#FF6B8A]/10 text-[#FF6B8A] rounded-lg hover:bg-[#FF6B8A]/20 transition-colors">
+                            <i data-lucide="plus" class="w-4 h-4"></i>
+                        </button>
                     </div>
                 </div>
 

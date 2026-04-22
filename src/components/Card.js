@@ -143,6 +143,39 @@ window.createTaskCard = function(task, deletingId = null, toggleDelete = () => {
             ${description ? `
                 <p class="text-xs text-gray-400 line-clamp-4 mt-1 leading-relaxed">${description}</p>
             ` : ''}
+
+            <!-- Barra de Progresso e Lista de Subtarefas -->
+            ${task.subtasks && task.subtasks.length > 0 ? (() => {
+                const total = task.subtasks.length;
+                const done = task.subtasks.filter(s => s.completed).length;
+                const pct = Math.round((done / total) * 100);
+                
+                const subtasksHtml = task.subtasks.map(s => `
+                    <div class="flex items-center gap-2 group/subtask px-1 py-0.5 rounded hover:bg-white/5 transition-colors" onclick="event.stopPropagation()">
+                        <input type="checkbox" ${s.completed ? 'checked' : ''} 
+                            onchange="window.toggleTaskSubtask('${id}', '${s.id}', event)"
+                            onclick="event.stopPropagation()"
+                            class="w-3 h-3 rounded border-[#2a2a44] bg-[#12121f] text-[#FF6B8A] focus:ring-[#FF6B8A] cursor-pointer">
+                        <span class="text-[10px] truncate ${s.completed ? 'line-through text-[#9090b0]' : 'text-[#e0e0ec]'}">${escapeHtml(s.text)}</span>
+                    </div>
+                `).join('');
+
+                return `
+                    <div class="mt-2 space-y-1.5">
+                        <div class="flex items-center justify-between text-[10px] text-gray-500">
+                            <span class="flex items-center gap-1"><i data-lucide="check-square" class="w-3 h-3"></i> ${done}/${total} Subtarefas</span>
+                            <span class="font-bold ${pct === 100 ? 'text-[#00C9A7]' : 'text-[#9090b0]'}">${pct}%</span>
+                        </div>
+                        <div class="w-full h-1.5 bg-[#12121f] rounded-full overflow-hidden border border-[#2a2a44]">
+                            <div class="h-full bg-gradient-to-r from-[#FF6B8A] to-[#FF8E53] transition-all duration-500" style="width: ${pct}%"></div>
+                        </div>
+                        <!-- Lista Expandível ou Compacta -->
+                        <div class="space-y-0.5 pt-1 max-h-24 overflow-y-auto custom-scrollbar">
+                            ${subtasksHtml}
+                        </div>
+                    </div>
+                `;
+            })() : ''}
             
             <!-- Select Status / Reações -->
             <div class="flex items-center justify-between mt-1 gap-2">
