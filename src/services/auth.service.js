@@ -1,18 +1,13 @@
-import { auth } from './firebase.js?v=5';
-import {
-    createUserWithEmailAndPassword,
-    signInWithEmailAndPassword,
-    signOut,
-    sendPasswordResetEmail,
-    updateProfile,
-    onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+/**
+ * auth.service.js
+ * Serviço de autenticação usando Firebase Compat (Global).
+ */
 
-export const authService = {
+window.authService = {
     // Cadastro
     async register(name, email, password) {
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
-        await updateProfile(cred.user, {
+        const cred = await window.auth.createUserWithEmailAndPassword(email, password);
+        await cred.user.updateProfile({
             displayName: name,
             photoURL: name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2)
         });
@@ -21,20 +16,22 @@ export const authService = {
 
     // Login
     async login(email, password) {
-        const cred = await signInWithEmailAndPassword(auth, email, password);
+        const cred = await window.auth.signInWithEmailAndPassword(email, password);
         return cred.user;
     },
 
     // Logout
-    async logout() { return signOut(auth); },
+    async logout() { 
+        return window.auth.signOut(); 
+    },
 
     // Resetar senha por email real
     async resetPassword(email) {
-        return sendPasswordResetEmail(auth, email);
+        return window.auth.sendPasswordResetEmail(email);
     },
 
     // Observer de sessão — chama callback com user ou null
     onAuthChange(callback) {
-        return onAuthStateChanged(auth, callback);
+        return window.auth.onAuthStateChanged(callback);
     }
 };

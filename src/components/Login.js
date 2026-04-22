@@ -1,5 +1,3 @@
-import { authService } from '../services/auth.service.js?v=5';
-import { dbService } from '../services/db.service.js?v=5';
 
 window.renderLogin = function() {
     const root = document.getElementById('login-root');

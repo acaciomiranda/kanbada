@@ -39,7 +39,7 @@ window.createTaskCard = function(task) {
         <div class="flex flex-col gap-3">
             <div class="flex items-center justify-between gap-2">
                 <div class="flex items-center gap-2 flex-1 min-w-0">
-                    <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="window.toggleTaskSelection('${id}', event)" onclick="event.stopPropagation()"
+                    <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="window.toggleTaskSelect('${id}', event)" onclick="event.stopPropagation()"
                         class="w-4 h-4 rounded border-[#2a2a44] bg-[#12121f] text-[#FF6B8A] focus:ring-[#FF6B8A] cursor-pointer">
                     ${tag ? `<span class="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase" style="background:${tagStyles.bg}; color:${tagStyles.text}">${tag}</span>` : ''}
                     <span class="text-[9px] text-[#9090b0] bg-white/5 px-2 py-0.5 rounded truncate"># ${project}</span>
@@ -53,7 +53,7 @@ window.createTaskCard = function(task) {
             <h4 class="text-sm font-bold leading-tight group-hover:text-[#FF6B8A] transition-colors">${title}</h4>
             
             ${task.subtasks && task.subtasks.length > 0 ? (() => {
-                const done = task.subtasks.filter(s => s.completed).length;
+                const done = task.subtasks.filter(s => s.done || s.completed).length;
                 const total = task.subtasks.length;
                 const pct = Math.round((done / total) * 100);
                 return `

@@ -1,11 +1,7 @@
 /**
  * app.js
- * Lógica principal do Kanbada: Login, Filtros, Notificações, Board e Importação Robusta.
- * Versão Firebase: Sincronização em nuvem e Autenticação Segura.
+ * Controlador principal do Kanbada.
  */
-
-import { authService } from './services/auth.service.js?v=5';
-import { dbService } from './services/db.service.js?v=5';
 
 // Global Error Logging
 window.onerror = function(msg, url, line, col, error) {
@@ -152,6 +148,186 @@ window.showToast = function (msg, type = 'success') {
     }, 3000);
 };
 
+// DIÁLOGOS CUSTOMIZADOS (PROMPT / CONFIRM)
+window.customPrompt = function(title, msg, defaultValue = '') {
+    return new Promise((resolve) => {
+        const dialog = document.getElementById('custom-dialog');
+        const dTitle = document.getElementById('dialog-title');
+        const dMsg = document.getElementById('dialog-msg');
+        const dInput = document.getElementById('dialog-input');
+        const dInputCont = document.getElementById('dialog-input-container');
+        const btnConfirm = document.getElementById('dialog-confirm');
+        const btnCancel = document.getElementById('dialog-cancel');
+
+        dTitle.textContent = title;
+        dMsg.textContent = msg;
+        dInput.value = defaultValue;
+        dInputCont.classList.remove('hidden');
+        dialog.classList.remove('hidden');
+        dInput.focus();
+
+        const cleanup = () => {
+            dialog.classList.add('hidden');
+            btnConfirm.onclick = null;
+            btnCancel.onclick = null;
+        };
+
+        btnConfirm.onclick = () => {
+            const val = dInput.value;
+            cleanup();
+            resolve(val);
+        };
+        btnCancel.onclick = () => {
+            cleanup();
+            resolve(null);
+        };
+    });
+};
+
+window.openModal = function(status = 'plan', taskId = null) {
+    const modal = document.getElementById('task-modal');
+    if (!modal) return;
+
+    editingTaskId = taskId;
+    const titleEl = document.getElementById('modal-title');
+    const form = document.getElementById('task-form');
+    
+    if (taskId) {
+        titleEl.textContent = 'Editar Tarefa';
+        const task = allTasks.find(t => t.__backendId === taskId);
+        if (task) {
+            document.getElementById('f-title').value = task.title || '';
+            document.getElementById('f-desc').value = task.desc || '';
+            document.getElementById('f-assignee').value = task.assignee || '';
+            document.getElementById('f-project').value = task.project || 'Geral';
+            document.getElementById('f-status').value = task.status || status;
+            document.getElementById('f-priority').value = task.priority || 'Média';
+            document.getElementById('f-due-date').value = task.due_date || '';
+            currentEditingSubtasks = [...(task.subtasks || [])];
+        }
+    } else {
+        titleEl.textContent = 'Nova Tarefa';
+        if (form) form.reset();
+        document.getElementById('f-status').value = status;
+        currentEditingSubtasks = [];
+    }
+
+    renderSubtasks();
+    modal.classList.remove('hidden');
+};
+
+window.closeModal = function() {
+    document.getElementById('task-modal')?.classList.add('hidden');
+};
+
+window.handleSubmit = async function(e) {
+    if (e) e.preventDefault();
+    const taskData = {
+        title: document.getElementById('f-title').value,
+        desc: document.getElementById('f-desc').value,
+        assignee: document.getElementById('f-assignee').value,
+        project: document.getElementById('f-project').value,
+        status: document.getElementById('f-status').value,
+        priority: document.getElementById('f-priority').value,
+        due_date: document.getElementById('f-due-date').value,
+        subtasks: currentEditingSubtasks,
+        createdAt: new Date().toISOString()
+    };
+    
+    let task;
+    if (editingTaskId) {
+        const idx = allTasks.findIndex(t => t.__backendId === editingTaskId);
+        if (idx !== -1) {
+            allTasks[idx] = { ...allTasks[idx], ...taskData };
+            task = allTasks[idx];
+        }
+    } else {
+        task = { ...taskData, __backendId: crypto.randomUUID() };
+        allTasks.push(task);
+    }
+    
+    await saveTasks(task);
+    window.renderBoard(allTasks);
+    window.closeModal();
+    window.showToast(editingTaskId ? 'Tarefa atualizada!' : 'Tarefa criada!');
+};
+
+window.addSubtask = function() {
+    const input = document.getElementById('f-subtask-input');
+    const text = input.value.trim();
+    if (!text) return;
+    currentEditingSubtasks.push({ text, done: false, completed: false }); // Sincronizado com Card.js
+    input.value = '';
+    renderSubtasks();
+};
+
+window.toggleSubtask = function(index) {
+    const st = currentEditingSubtasks[index];
+    st.done = !st.done;
+    st.completed = st.done; // Sincronizado com Card.js
+    renderSubtasks();
+};
+
+window.removeSubtask = function(index) {
+    currentEditingSubtasks.splice(index, 1);
+    renderSubtasks();
+};
+
+window.customConfirm = function(title, msg, isDanger = false) {
+    return new Promise((resolve) => {
+        const dialog = document.getElementById('custom-dialog');
+        const dTitle = document.getElementById('dialog-title');
+        const dMsg = document.getElementById('dialog-msg');
+        const dInputCont = document.getElementById('dialog-input-container');
+        const btnConfirm = document.getElementById('dialog-confirm');
+        const btnCancel = document.getElementById('dialog-cancel');
+
+        dTitle.textContent = title;
+        dMsg.textContent = msg;
+        dInputCont.classList.add('hidden');
+        dialog.classList.remove('hidden');
+
+        if (isDanger) {
+            btnConfirm.style.background = '#FF6B8A';
+        } else {
+            btnConfirm.style.background = '#6C63FF';
+        }
+
+        const cleanup = () => {
+            dialog.classList.add('hidden');
+            btnConfirm.onclick = null;
+            btnCancel.onclick = null;
+        };
+
+        btnConfirm.onclick = () => {
+            cleanup();
+            resolve(true);
+        };
+        btnCancel.onclick = () => {
+            cleanup();
+            resolve(false);
+        };
+    });
+};
+
+// SUBTAREFAS
+function renderSubtasks() {
+    const container = document.getElementById('subtasks-list');
+    if (!container) return;
+    container.innerHTML = currentEditingSubtasks.map((st, index) => `
+        <div class="flex items-center gap-3 p-3 bg-[#12121f] rounded-xl border border-[#2a2a44] group">
+            <input type="checkbox" ${st.done ? 'checked' : ''} 
+                onchange="window.toggleSubtask(${index})"
+                class="w-4 h-4 rounded border-[#2a2a44] bg-transparent text-[#FF6B8A] focus:ring-[#FF6B8A]">
+            <span class="text-sm flex-1 ${st.done ? 'line-through text-gray-500' : 'text-gray-300'}">${st.text}</span>
+            <button type="button" onclick="window.removeSubtask(${index})" class="text-gray-500 hover:text-[#FF6B8A] opacity-0 group-hover:opacity-100 transition-all">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+    `).join('');
+    if (window.lucide) window.lucide.createIcons({ scope: container });
+}
+
 // --- AUTH (FIREBASE OBSERVER) ---
 function checkAuth() {
     authService.onAuthChange(async (user) => {
@@ -234,7 +410,7 @@ function parseCSV(text) {
 // --- IMPORT ASANA/CSV ROBUSTO ---
 window.triggerImport = () => document.getElementById('asana-import-input').click();
 
-window.handleAsanaImport = function (e) {
+window.handleFileImport = function (e) {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -242,7 +418,6 @@ window.handleAsanaImport = function (e) {
     window.showToast('Processando arquivo...');
 
     if (fileType === 'csv') {
-        // Processar CSV
         const reader = new FileReader();
         reader.onload = function (evt) {
             try {
@@ -325,9 +500,15 @@ function checkDuplicatesAndImport(newTasks) {
 
     if (duplicates.length > 0) {
         pendingImportTasks = newTasks;
-        document.getElementById('import-modal-msg').innerHTML =
-            `O arquivo contém <strong>${newTasks.length}</strong> tarefas.<br>Detectamos <strong>${duplicates.length}</strong> duplicatas.<br><br>Como deseja prosseguir?`;
-        document.getElementById('import-modal').classList.remove('hidden');
+        // Se houver modal de importação, exibe. Caso contrário, apenas importa (fallback seguro)
+        const modalMsg = document.getElementById('import-modal-msg');
+        const modal = document.getElementById('import-modal');
+        if (modal && modalMsg) {
+            modalMsg.innerHTML = `O arquivo contém <strong>${newTasks.length}</strong> tarefas.<br>Detectamos <strong>${duplicates.length}</strong> duplicatas.<br><br>Como deseja prosseguir?`;
+            modal.classList.remove('hidden');
+        } else {
+            completeImport(newTasks);
+        }
     } else {
         completeImport(newTasks);
     }
@@ -361,8 +542,10 @@ async function completeImport(tasks) {
     if (!currentUser) return;
     try {
         window.showToast(`Importando ${tasks.length} tarefas...`);
-        await dbService.batchSaveTasks(currentUser.uid, tasks);
-        allTasks = [...allTasks, ...tasks];
+        // Garante que todas tenham __backendId antes de salvar
+        const tasksToSave = tasks.map(t => ({...t, __backendId: t.__backendId || crypto.randomUUID()}));
+        await dbService.batchSaveTasks(currentUser.uid, tasksToSave);
+        allTasks = [...allTasks, ...tasksToSave];
         window.renderBoard(allTasks);
         window.showToast(`${tasks.length} tarefas importadas!`);
         addNotification(`${tasks.length} tarefas importadas.`);
@@ -567,6 +750,173 @@ window.renderBoard = function (data) {
     initSortable();
     updateProjectSelects();
     updateBulkBar();
+};
+
+function initSortable() {
+    const cols = document.querySelectorAll('.kanban-col');
+    cols.forEach(col => {
+        new Sortable(col, {
+            group: 'tasks',
+            animation: 150,
+            ghostClass: 'opacity-50',
+            dragClass: 'rotate-2',
+            onEnd: async (evt) => {
+                const taskId = evt.item.dataset.id;
+                const newStatus = evt.to.dataset.status;
+                const task = allTasks.find(t => t.__backendId === taskId);
+                if (task && task.status !== newStatus) {
+                    task.status = newStatus;
+                    await saveTasks(task);
+                    window.renderBoard(allTasks);
+                    window.showToast(`Tarefa movida para ${newStatus}`);
+                }
+            }
+        });
+    });
+}
+
+function renderListView(tasks) {
+    const container = document.getElementById('kanban-board-container');
+    if (!container) return;
+    
+    if (tasks.length === 0) {
+        container.innerHTML = `
+            <div class="w-full flex flex-col items-center justify-center py-20 text-gray-500">
+                <i data-lucide="inbox" class="w-16 h-16 mb-4 opacity-20"></i>
+                <p>Nenhuma tarefa encontrada nesta visualização.</p>
+            </div>
+        `;
+        if (window.lucide) window.lucide.createIcons({ scope: container });
+        return;
+    }
+
+    const tableHtml = `
+        <div class="w-full overflow-x-auto bg-[#1e1e36] rounded-[24px] border border-[#2a2a44] p-2">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="text-[10px] font-bold text-gray-500 uppercase tracking-widest border-bottom border-[#2a2a44]">
+                        <th class="px-6 py-4 w-10">
+                            <input type="checkbox" onchange="window.toggleAllSelect(this.checked)" class="rounded bg-transparent border-[#2a2a44]">
+                        </th>
+                        <th class="px-6 py-4">Tarefa</th>
+                        <th class="px-6 py-4">Status</th>
+                        <th class="px-6 py-4">Projeto</th>
+                        <th class="px-6 py-4">Prioridade</th>
+                        <th class="px-6 py-4">Entrega</th>
+                        <th class="px-6 py-4 text-right">Ações</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-[#2a2a44]/50">
+                    ${tasks.map(t => `
+                        <tr class="group hover:bg-white/[0.02] transition-colors">
+                            <td class="px-6 py-4">
+                                <input type="checkbox" ${selectedTaskIds.includes(t.__backendId) ? 'checked' : ''} 
+                                    onchange="window.toggleTaskSelect('${t.__backendId}')"
+                                    class="rounded bg-transparent border-[#2a2a44] text-[#FF6B8A] focus:ring-[#FF6B8A]">
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="flex flex-col">
+                                    <span class="text-sm font-bold text-white">${t.title}</span>
+                                    <span class="text-[10px] text-gray-500 truncate max-w-[200px]">${t.desc || 'Sem descrição'}</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <span class="px-2 py-1 rounded-full text-[10px] font-bold" 
+                                    style="background:${allColumns.find(c => c.id === t.status)?.color}20; color:${allColumns.find(c => c.id === t.status)?.color}">
+                                    ${allColumns.find(c => c.id === t.status)?.title || t.status}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-2 h-2 rounded-full" style="background:${allProjects.find(p => p.name === t.project)?.color || '#9090b0'}"></div>
+                                    <span class="text-xs text-gray-400">${t.project || 'Geral'}</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <span class="text-xs font-medium ${t.priority === 'Alta' ? 'text-[#FF6B8A]' : t.priority === 'Média' ? 'text-[#FFB84D]' : 'text-[#00C9A7]'}">
+                                    ${t.priority || 'Média'}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-xs text-gray-500">
+                                ${t.due_date ? new Date(t.due_date).toLocaleDateString('pt-BR') : '-'}
+                            </td>
+                            <td class="px-6 py-4 text-right">
+                                <button onclick="window.openModal('${t.status}', '${t.id}')" class="p-2 text-gray-500 hover:text-white transition-colors">
+                                    <i data-lucide="edit-2" class="w-4 h-4"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+    container.innerHTML = tableHtml;
+    if (window.lucide) window.lucide.createIcons({ scope: container });
+}
+
+function updateBulkBar() {
+    const bar = document.getElementById('bulk-bar');
+    if (!bar) return;
+    if (selectedTaskIds.length > 0) {
+        bar.classList.remove('hidden');
+        const countEl = document.getElementById('selected-count');
+        if (countEl) countEl.textContent = selectedTaskIds.length;
+    } else {
+        bar.classList.add('hidden');
+    }
+}
+
+window.toggleTaskSelect = function(id) {
+    if (selectedTaskIds.includes(id)) {
+        selectedTaskIds = selectedTaskIds.filter(i => i !== id);
+    } else {
+        selectedTaskIds.push(id);
+    }
+    updateBulkBar();
+};
+
+window.toggleAllSelect = function(checked) {
+    const visible = getVisibleTasks();
+    if (checked) {
+        selectedTaskIds = visible.map(t => t.__backendId);
+    } else {
+        selectedTaskIds = [];
+    }
+    window.renderBoard(allTasks);
+};
+
+window.bulkArchive = async function() {
+    const confirm = await window.customConfirm('Arquivar em Massa', `Deseja arquivar ${selectedTaskIds.length} tarefas?`, false);
+    if (!confirm) return;
+    
+    for (const id of selectedTaskIds) {
+        const task = allTasks.find(t => t.__backendId === id);
+        if (task) {
+            task.archived = true;
+            await saveTasks(task);
+        }
+    }
+    selectedTaskIds = [];
+    window.renderBoard(allTasks);
+    window.showToast('Tarefas arquivadas!');
+};
+
+window.bulkDelete = async function() {
+    const confirm = await window.customConfirm('Excluir em Massa', `Deseja enviar ${selectedTaskIds.length} tarefas para a lixeira?`, true);
+    if (!confirm) return;
+    
+    for (const id of selectedTaskIds) {
+        const task = allTasks.find(t => t.__backendId === id);
+        if (task) {
+            task.deleted = true;
+            task.deletedAt = new Date().toISOString();
+            await saveTasks(task);
+        }
+    }
+    selectedTaskIds = [];
+    window.renderBoard(allTasks);
+    window.showToast('Tarefas enviadas para a lixeira!');
 };
 
 window.clearFilters = function () {
@@ -840,6 +1190,74 @@ window.openSidebar = () => {
 window.closeSidebar = () => {
     document.getElementById('sidebar')?.classList.add('-translate-x-full');
     document.getElementById('sidebar-overlay')?.classList.add('hidden');
+};
+
+// Funções Globais Adicionais
+window.editTask = function(id) {
+    window.openModal('plan', id);
+};
+
+window.toggleDelete = async function(id) {
+    const confirm = await window.customConfirm('Mover para Lixeira', 'Deseja realmente enviar esta tarefa para a lixeira?', true);
+    if (!confirm) return;
+    const task = allTasks.find(t => t.__backendId === id);
+    if (task) {
+        task.deleted = true;
+        task.deletedAt = new Date().toISOString();
+        await saveTasks(task);
+        window.renderBoard(allTasks);
+        window.showToast('Tarefa movida para a lixeira');
+    }
+};
+
+window.clearSelection = function() {
+    selectedTaskIds = [];
+    window.renderBoard(allTasks);
+};
+
+window.bulkMoveToColumn = async function(newStatus) {
+    if (!newStatus) return;
+    const confirm = await window.customConfirm('Mover em Massa', `Mover ${selectedTaskIds.length} tarefas para "${newStatus}"?`);
+    if (!confirm) return;
+    
+    for (const id of selectedTaskIds) {
+        const task = allTasks.find(t => t.__backendId === id);
+        if (task) {
+            task.status = newStatus;
+            await saveTasks(task);
+        }
+    }
+    selectedTaskIds = [];
+    window.renderBoard(allTasks);
+    window.showToast('Tarefas movidas com sucesso!');
+};
+
+window.toggleMyTasks = function() {
+    showOnlyMyTasks = !showOnlyMyTasks;
+    const btn = document.getElementById('btn-filter-my');
+    if (btn) {
+        if (showOnlyMyTasks) {
+            btn.classList.add('bg-[#FF6B8A]/20', 'border-[#FF6B8A]/50', 'text-[#FF6B8A]');
+        } else {
+            btn.classList.remove('bg-[#FF6B8A]/20', 'border-[#FF6B8A]/50', 'text-[#FF6B8A]');
+        }
+    }
+    window.renderBoard(allTasks);
+};
+
+window.toggleNotifications = function() {
+    const popover = document.getElementById('notif-popover');
+    popover?.classList.toggle('hidden');
+};
+
+window.clearNotifications = function() {
+    notifications = [];
+    saveNotifications();
+    updateNotificationUI();
+};
+
+window.printReport = function() {
+    window.print();
 };
 
 // --- COLUNAS ---

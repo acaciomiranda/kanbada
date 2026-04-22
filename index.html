@@ -52,6 +52,9 @@
 
     <!-- Root de Login (Firebase) -->
     <div id="login-root"></div>
+    
+    <!-- Toast de Notificação -->
+    <div id="toast" class="hidden"></div>
 
     <!-- Interface Principal do App (Oculta até o login) -->
     <div id="app" class="hidden h-screen flex overflow-hidden">
@@ -200,8 +203,8 @@
 
                 <div class="flex items-center gap-2 ml-auto">
                     <!-- Botões de Ação em Massa (Aparecem quando tarefas são selecionadas) -->
-                    <div id="bulk-actions" class="hidden items-center gap-2 px-3 py-1.5 bg-[#FF6B8A]/10 border border-[#FF6B8A]/30 rounded-xl animate-fade-in">
-                        <span id="bulk-count" class="text-xs font-bold text-[#FF6B8A] mr-2">3 Selecionados</span>
+                    <div id="bulk-bar" class="hidden items-center gap-2 px-3 py-1.5 bg-[#FF6B8A]/10 border border-[#FF6B8A]/30 rounded-xl animate-fade-in">
+                        <span id="selected-count" class="text-xs font-bold text-[#FF6B8A] mr-2">0 Selecionados</span>
                         <div class="flex gap-1">
                             <select id="bulk-status-select" onchange="window.bulkMoveToColumn(this.value); this.value=''" 
                                 class="bg-[#12121f] text-[10px] font-bold text-white px-2 py-1 rounded border border-[#FF6B8A]/30 outline-none">
@@ -271,7 +274,7 @@
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Data Limite</label>
-                                <input type="date" id="f-date"
+                                <input type="date" id="f-due-date"
                                     class="w-full bg-[#12121f] border border-[#2a2a44] rounded-xl px-4 py-2 outline-none focus:border-[#6C63FF] transition-all text-sm">
                             </div>
                             <div>
@@ -291,6 +294,18 @@
                                 </select>
                             </div>
                             <div>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Prioridade</label>
+                                <select id="f-priority"
+                                    class="w-full bg-[#12121f] border border-[#2a2a44] rounded-xl px-4 py-2 outline-none focus:border-[#FFB84D] transition-all text-sm appearance-none">
+                                    <option value="Baixa">Baixa</option>
+                                    <option value="Média" selected>Média</option>
+                                    <option value="Alta">Alta</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="hidden">
+                            <div>
                                 <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Etiqueta (Tag)</label>
                                 <div class="flex gap-2">
                                     <input type="text" id="f-tag" placeholder="Ex: Urgente"
@@ -303,7 +318,7 @@
 
                         <div>
                             <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5 ml-1">Descrição</label>
-                            <textarea id="f-description" rows="4" placeholder="Detalhes da tarefa..."
+                            <textarea id="f-desc" rows="4" placeholder="Detalhes da tarefa..."
                                 class="w-full bg-[#12121f] border border-[#2a2a44] rounded-xl px-4 py-2.5 outline-none focus:border-[#FF6B8A] transition-all text-sm resize-none custom-scrollbar"></textarea>
                         </div>
                     </div>
@@ -317,14 +332,14 @@
                             </div>
                             
                             <div class="flex gap-2 mb-3">
-                                <input type="text" id="new-subtask-text" placeholder="Adicionar passo..."
+                                <input type="text" id="f-subtask-input" placeholder="Adicionar passo..."
                                     class="flex-1 bg-[#12121f] border border-[#2a2a44] rounded-xl px-4 py-2 outline-none focus:border-[#FF6B8A] transition-all text-xs">
                                 <button type="button" onclick="window.addSubtask()" class="bg-[#1e1e36] border border-[#2a2a44] hover:border-[#FF6B8A] hover:text-[#FF6B8A] w-9 h-9 rounded-xl flex items-center justify-center transition-all">
                                     <i data-lucide="plus" class="w-4 h-4"></i>
                                 </button>
                             </div>
                             
-                            <div id="subtasks-container" class="max-h-56 overflow-y-auto custom-scrollbar pr-2 space-y-2 mb-4">
+                            <div id="subtasks-list" class="max-h-56 overflow-y-auto custom-scrollbar pr-2 space-y-2 mb-4">
                                 <!-- Subtarefas injetadas via JS -->
                                 <div class="text-center py-8 text-gray-600 italic text-xs border-2 border-dashed border-[#2a2a44] rounded-2xl">
                                     Nenhuma subtarefa adicionada
@@ -378,75 +393,31 @@
                 </div>
             </div>
             
-            <div class="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                <!-- Dashboard de KPIs -->
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
-                    <div class="bg-[#12121f] p-6 rounded-3xl border border-[#2a2a44] relative overflow-hidden group">
-                        <div class="absolute -right-4 -top-4 w-20 h-20 bg-[#FF6B8A]/10 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
-                        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Total de Tarefas</div>
-                        <div id="kpi-total" class="text-3xl font-extrabold text-white">0</div>
-                    </div>
-                    <div class="bg-[#12121f] p-6 rounded-3xl border border-[#2a2a44] relative overflow-hidden group">
-                        <div class="absolute -right-4 -top-4 w-20 h-20 bg-[#00C9A7]/10 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
-                        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Concluídas</div>
-                        <div id="kpi-done" class="text-3xl font-extrabold text-[#00C9A7]">0</div>
-                    </div>
-                    <div class="bg-[#12121f] p-6 rounded-3xl border border-[#2a2a44] relative overflow-hidden group">
-                        <div class="absolute -right-4 -top-4 w-20 h-20 bg-[#6C63FF]/10 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
-                        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Taxa de Sucesso</div>
-                        <div id="kpi-rate" class="text-3xl font-extrabold text-[#6C63FF]">0%</div>
-                    </div>
-                    <div class="bg-[#12121f] p-6 rounded-3xl border border-[#2a2a44] relative overflow-hidden group">
-                        <div class="absolute -right-4 -top-4 w-20 h-20 bg-[#FFB84D]/10 rounded-full blur-2xl group-hover:scale-150 transition-transform"></div>
-                        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Em Atraso</div>
-                        <div id="kpi-late" class="text-3xl font-extrabold text-[#FFB84D]">0</div>
-                    </div>
-                </div>
-                
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                    <!-- Gráfico 1: Status -->
-                    <div class="bg-[#12121f]/50 p-8 rounded-[32px] border border-[#2a2a44]">
-                        <h4 class="text-sm font-bold text-white mb-6 flex items-center gap-2">
-                            <i data-lucide="pie-chart" class="w-4 h-4 text-[#FF6B8A]"></i> Distribuição por Status
-                        </h4>
-                        <div class="h-64 flex items-center justify-center">
-                            <canvas id="chart-status"></canvas>
-                        </div>
-                    </div>
-                    
-                    <!-- Gráfico 2: Projetos -->
-                    <div class="bg-[#12121f]/50 p-8 rounded-[32px] border border-[#2a2a44]">
-                        <h4 class="text-sm font-bold text-white mb-6 flex items-center gap-2">
-                            <i data-lucide="folder" class="w-4 h-4 text-[#6C63FF]"></i> Tarefas por Projeto
-                        </h4>
-                        <div class="h-64 flex items-center justify-center">
-                            <canvas id="chart-projects"></canvas>
-                        </div>
-                    </div>
-
-                    <!-- Gráfico 3: Ranking de Responsáveis -->
-                    <div class="bg-[#12121f]/50 p-8 rounded-[32px] border border-[#2a2a44]">
-                        <h4 class="text-sm font-bold text-white mb-6 flex items-center gap-2">
-                            <i data-lucide="users" class="w-4 h-4 text-[#00C9A7]"></i> Ranking de Produtividade
-                        </h4>
-                        <div class="h-64 flex items-center justify-center">
-                            <canvas id="chart-users"></canvas>
-                        </div>
-                    </div>
-
-                    <!-- Quadro de Insights Rápidos -->
-                    <div class="bg-gradient-to-br from-[#6C63FF]/10 to-[#FF6B8A]/10 p-8 rounded-[32px] border border-white/5">
-                        <h4 class="text-sm font-bold text-white mb-6">Sugestões de IA</h4>
-                        <div id="report-insights" class="space-y-4">
-                            <!-- Insights gerados via JS -->
-                        </div>
-                    </div>
-                </div>
+            <div class="flex-1 overflow-y-auto p-8 custom-scrollbar" id="reports-content">
+                <!-- O conteúdo dos relatórios é injetado dinamicamente via JS (app.js:showReports) -->
             </div>
         </div>
     </div>
 
     <!-- MODAL CUSTOM: PROMPT/CONFIRM -->
+    <!-- MODAL: CONFIRMAÇÃO DE IMPORTAÇÃO -->
+    <div id="import-modal" class="fixed inset-0 z-[4000] hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/80 backdrop-blur-md"></div>
+        <div class="relative bg-[#1e1e36] w-full max-w-md rounded-[28px] border border-[#2a2a44] shadow-2xl p-8 animate-zoom-in text-center">
+            <div class="w-16 h-16 rounded-2xl bg-[#6C63FF]/10 flex items-center justify-center mb-6 mx-auto">
+                <i data-lucide="upload-cloud" class="w-8 h-8 text-[#6C63FF]"></i>
+            </div>
+            <h3 class="text-xl font-bold text-white mb-2">Importar Tarefas</h3>
+            <p id="import-modal-msg" class="text-gray-400 text-sm leading-relaxed mb-8">Detectamos duplicatas. Como deseja prosseguir?</p>
+            
+            <div class="flex flex-col gap-3">
+                <button onclick="window.confirmImport('replace')" class="w-full bg-[#FF6B8A] hover:bg-pink-600 text-white font-extrabold py-3.5 rounded-xl transition-all shadow-lg active:scale-95">Substituir Duplicatas</button>
+                <button onclick="window.confirmImport('append')" class="w-full bg-[#6C63FF] hover:bg-indigo-600 text-white font-extrabold py-3.5 rounded-xl transition-all shadow-lg active:scale-95">Manter Ambas (Criar Cópias)</button>
+                <button onclick="window.confirmImport('cancel')" class="w-full bg-white/5 hover:bg-white/10 text-gray-400 font-bold py-3.5 rounded-xl transition-all active:scale-95">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
     <div id="custom-dialog" class="fixed inset-0 z-[5000] hidden flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-black/80 backdrop-blur-md"></div>
         <div class="relative bg-[#1e1e36] w-full max-w-md rounded-[28px] border border-[#2a2a44] shadow-2xl p-8 animate-zoom-in">
@@ -468,16 +439,42 @@
     </div>
 
     <!-- Scripts do App -->
-    <script type="module" src="src/app.js?v=5"></script>
-    <script type="module" src="src/components/Login.js?v=5"></script>
-    <script type="module" src="src/components/Card.js?v=5"></script>
-    <script type="module" src="src/components/Column.js?v=5"></script>
-    
+    <!-- Firebase SDK (Compat Version para suporte global sem módulos) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
     <script>
-        // Inicializa Lucide no carregamento
-        document.addEventListener('DOMContentLoaded', () => {
-            if (window.lucide) window.lucide.createIcons();
-        });
+        // Configuração Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyDTV-UqLzI0yowiMqCTcMqY1hZxKsXduZ4",
+            authDomain: "kanbada-2150a.firebaseapp.com",
+            projectId: "kanbada-2150a",
+            storageBucket: "kanbada-2150a.firebasestorage.app",
+            messagingSenderId: "842982188246",
+            appId: "1:842982188246:web:820dd5d6c519bdf97a9577",
+            measurementId: "G-8CRVWKS2G8"
+        };
+        // Inicialização Global
+        firebase.initializeApp(firebaseConfig);
+        window.auth = firebase.auth();
+        window.db = firebase.firestore();
+    </script>
+
+    <!-- App Scripts (Sem type="module") -->
+    <script src="src/services/auth.service.js?v=6"></script>
+    <script src="src/services/db.service.js?v=6"></script>
+    <script src="src/services/data_mapper.js?v=6"></script>
+    <script src="src/app.js?v=6"></script>
+    <script src="src/components/Login.js?v=6"></script>
+    <script src="src/components/Card.js?v=6"></script>
+    <script src="src/components/Column.js?v=6"></script>
+
+    <script>
+        // Previne erros de carregamento se o Lucide falhar
+        if (!window.lucide) {
+            window.lucide = { createIcons: () => {} };
+        }
     </script>
 </body>
 </html>

@@ -25,8 +25,8 @@
 
 ## 🛠️ Tecnologias e Dependências
 
-- **Core:** HTML5, CSS3, e JavaScript ES6+ (Módulos).
-- **Backend-as-a-Service:** [Firebase](https://firebase.google.com/) (Auth & Firestore).
+- **Core:** HTML5, CSS3, e JavaScript ES6+ (Carregamento Global).
+- **Backend-as-a-Service:** [Firebase](https://firebase.google.com/) (SDK Compat - Auth & Firestore).
 - **Design:** [Tailwind CSS](https://tailwindcss.com/) via CDN.
 - **Ícones:** [Lucide Icons](https://lucide.dev/).
 - **Drag & Drop:** [SortableJS](https://sortablejs.github.io/Sortable/).
@@ -36,7 +36,7 @@
 
 ```text
 kanbada/
-├── index.html                   # Página principal (Single Page App)
+├── index.html                   # Página principal (Single Page App) c/ Config Firebase
 └── src/
     ├── styles/
     │   └── style.css            # Design system e animações
@@ -45,9 +45,9 @@ kanbada/
     │   ├── Column.js            # Estrutura das colunas
     │   └── Login.js             # UI de Autenticação Firebase
     ├── services/
-    │   ├── firebase.js          # Configuração do SDK Firebase
-    │   ├── auth.service.js      # Lógica de Login/Cadastro
-    │   └── db.service.js        # Operações CRUD no Firestore
+    │   ├── auth.service.js      # Lógica de Login/Cadastro (Global)
+    │   ├── db.service.js        # Operações CRUD no Firestore (Global)
+    │   └── data_mapper.js       # Importação e normalização Asana
     └── app.js                   # Lógica central e Gerenciamento de Estado
 ```
 
@@ -58,12 +58,12 @@ kanbada/
 2. Ativar **Authentication** (E-mail/Senha) e **Cloud Firestore**.
 
 ### Configuração
-1. Edite o arquivo `src/services/firebase.js` com as suas chaves do Firebase:
-   ```javascript
+1. Edite o bloco de configuração diretamente no `<head>` ou topo do `index.html` com as suas chaves do Firebase:
+   ```html
    const firebaseConfig = {
        apiKey: "SUA_API_KEY",
        authDomain: "SEU_DOMINIO.firebaseapp.com",
-       projectId: "SEU_PROJECT_ID",
+       projectId: "SEU_PROJECT_ID"
        // ... outras chaves
    };
    ```
