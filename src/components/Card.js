@@ -29,10 +29,11 @@ window.createTaskCard = function(task, deletingId = null, toggleDelete = () => {
     
     // Design Dark Mode
     const baseClasses = "group relative p-4 rounded-[18px] shadow-sm hover:shadow-xl transition-all duration-300 border cursor-grab active:cursor-grabbing";
-    const colorClasses = "bg-[#1e1e36] text-[#e0e0ec]";
-    const borderClasses = isLocal ? "border-[#FF6B8A]/40 border-dashed" : "border-transparent hover:border-[#FF6B8A]/30";
+    const isSelected = (window.selectedTaskIds || []).includes(id);
+    const borderClasses = isSelected ? "border-[#FF6B8A]" : (isLocal ? "border-[#FF6B8A]/40 border-dashed" : "border-transparent hover:border-[#FF6B8A]/30");
+    const selectionBg = isSelected ? "bg-[#FF6B8A]/5" : "bg-[#1e1e36]";
     
-    card.className = `${baseClasses} ${colorClasses} ${borderClasses}`;
+    card.className = `${baseClasses} ${selectionBg} text-[#e0e0ec] ${borderClasses}`;
     card.dataset.id = id;
     card.style.animation = "fadeIn 0.4s ease-out";
     card.onclick = function(e) {
@@ -88,6 +89,12 @@ window.createTaskCard = function(task, deletingId = null, toggleDelete = () => {
             <!-- Cabeçalho com Tag e Projeto -->
             <div class="flex items-center justify-between gap-2">
                 <div class="flex items-center gap-2 flex-1 min-w-0">
+                    <input type="checkbox" 
+                        ${(window.selectedTaskIds || []).includes(id) ? 'checked' : ''}
+                        onchange="window.toggleTaskSelection('${id}', event)"
+                        onclick="event.stopPropagation()"
+                        class="w-4 h-4 rounded border-[#2a2a44] bg-[#12121f] text-[#FF6B8A] focus:ring-[#FF6B8A] cursor-pointer transition-all">
+                        
                     ${task.tag ? `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase flex-shrink-0" style="background:${tagStyles.bg}; color:${tagStyles.text}">${tag}</span>` : ''}
                     ${project && project !== 'Geral' ? `<span class="text-[9px] text-[#9090b0] bg-white/5 px-2 py-1 rounded-md font-medium tracking-wide truncate"># ${project}</span>` : ''}
                 </div>

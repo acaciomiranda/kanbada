@@ -14,6 +14,7 @@ let searchTerm = '';
 let deletingId = null;
 let pendingImportTasks = [];
 let viewMode = 'board'; // 'board', 'archive', 'recycle'
+window.selectedTaskIds = []; // IDs das tarefas selecionadas para ações em massa
 
 let allProjects = ['Redesign App', 'Marketing Q4', 'Lançamento v2'];
 let allColumns = [
@@ -451,6 +452,8 @@ window.renderBoard = function(data) {
         const countEl = document.getElementById(`count-${col.id}`);
         if (countEl) countEl.textContent = tasks.length;
     });
+
+    updateBulkBar();
 };
 
 window.clearFilters = function() {
@@ -1073,6 +1076,107 @@ window.changeTaskStatus = function(id, newStatus, event) {
         window.renderBoard(allTasks);
     }
 };
+
+// --- AÇÕES EM MASSA ---
+window.toggleTaskSelection = function(id, event) {
+    if (window.selectedTaskIds.includes(id)) {
+        window.selectedTaskIds = window.selectedTaskIds.filter(tid => tid !== id);
+    } else {
+        window.selectedTaskIds.push(id);
+    }
+    window.renderBoard(allTasks);
+};
+
+window.clearSelection = function() {
+    window.selectedTaskIds = [];
+    window.renderBoard(allTasks);
+};
+
+window.bulkSelectAll = function() {
+    // Seleciona apenas as tarefas visíveis no modo atual
+    const visibleTasks = getVisibleTasks();
+    window.selectedTaskIds = visibleTasks.map(t => t.__backendId);
+    window.renderBoard(allTasks);
+};
+
+window.bulkSelectStatus = function(columnId) {
+    const statusTasks = getVisibleTasks().filter(t => t.status === columnId);
+    statusTasks.forEach(t => {
+        if (!window.selectedTaskIds.includes(t.__backendId)) {
+            window.selectedTaskIds.push(t.__backendId);
+        }
+    });
+    window.renderBoard(allTasks);
+};
+
+window.bulkDelete = function() {
+    if (window.selectedTaskIds.length === 0) return;
+    if (!confirm(`Deseja realmente excluir ${window.selectedTaskIds.length} tarefas selecionadas?`)) return;
+
+    window.selectedTaskIds.forEach(id => {
+        const task = allTasks.find(t => t.__backendId.toString() === id.toString());
+        if (task) {
+            if (task.deleted) {
+                const idx = allTasks.indexOf(task);
+                allTasks.splice(idx, 1);
+            } else {
+                task.deleted = true;
+                task.archived = false;
+                task.deletedAt = new Date().toISOString();
+            }
+        }
+    });
+
+    window.selectedTaskIds = [];
+    saveTasks();
+    window.renderBoard(allTasks);
+    window.showToast('Tarefas excluídas com sucesso!');
+};
+
+function getVisibleTasks() {
+    let filtered = allTasks;
+    if (viewMode === 'board') {
+        filtered = allTasks.filter(t => !t.archived && !t.deleted);
+        if (currentProjectFilter) filtered = filtered.filter(t => t.project === currentProjectFilter);
+    } else if (viewMode === 'archive') {
+        filtered = allTasks.filter(t => t.archived && !t.deleted);
+    } else if (viewMode === 'recycle') {
+        filtered = allTasks.filter(t => t.deleted);
+    }
+    
+    if (searchTerm) {
+        filtered = filtered.filter(t => 
+            t.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            t.assignee.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }
+    return filtered;
+}
+
+function updateBulkBar() {
+    const bar = document.getElementById('bulk-actions-bar');
+    const countSpan = document.getElementById('selected-count');
+    const dropdown = document.getElementById('bulk-status-dropdown');
+
+    if (!bar || !countSpan) return;
+
+    if (window.selectedTaskIds.length > 0) {
+        bar.classList.remove('hidden');
+        countSpan.textContent = `${window.selectedTaskIds.length} selecionada(s)`;
+        
+        // Atualiza dropdown de status
+        if (dropdown) {
+            dropdown.innerHTML = window.allColumns.map(col => `
+                <button onclick="window.bulkSelectStatus('${col.id}')" 
+                    class="w-full text-left px-4 py-2 text-[11px] text-gray-300 hover:bg-white/5 hover:text-[#FF6B8A] transition-colors">
+                    ${col.title}
+                </button>
+            `).join('');
+        }
+    } else {
+        bar.classList.add('hidden');
+    }
+}
 
 // --- START APP ---
 function initSortable() {
