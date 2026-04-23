@@ -871,7 +871,62 @@ window.renderBoard = async function (data) {
     // Se estiver em modo lista, renderiza tabela e sai
     if (viewMode === 'list') {
         if (boardTitle && (viewMode === 'board' || viewMode === 'list')) boardTitle.textContent = 'Quadro de Tarefas';
+        const container = document.getElementById('kanban-board-container');
+        if (container) {
+            container.className = "flex flex-col h-full p-6 pt-2 gap-6";
+        }
         renderListView(filtered);
+        updateBulkBar();
+        return;
+    }
+
+    // Se estiver em modo Arquivo ou Lixeira (Grid 3x9)
+    if (viewMode === 'archive' || viewMode === 'recycle') {
+        if (boardTitle) boardTitle.textContent = viewMode === 'archive' ? 'Arquivo' : 'Lixeira (Últimos 7 dias)';
+        
+        let tasks = [...filtered];
+        // Ordenar por data de modificação ou criação (mais recentes primeiro)
+        tasks.sort((a, b) => {
+            const timeA = a.updatedAt ? (typeof a.updatedAt.toDate === 'function' ? a.updatedAt.toDate().getTime() : new Date(a.updatedAt).getTime()) : 0;
+            const timeB = b.updatedAt ? (typeof b.updatedAt.toDate === 'function' ? b.updatedAt.toDate().getTime() : new Date(b.updatedAt).getTime()) : 0;
+            return timeB - timeA;
+        });
+        
+        // Limite de 27 tarefas (3 colunas x 9 linhas)
+        tasks = tasks.slice(0, 27);
+
+        const container = document.getElementById('kanban-board-container');
+        if (container) {
+            // Remove 'min-w-max' e ajusta layout para o grid
+            container.className = "w-full h-full p-6 pt-2";
+            
+            container.innerHTML = `
+                <div class="w-full max-w-7xl mx-auto">
+                    <div class="flex items-center justify-between mb-4">
+                        <span class="font-semibold text-sm" style="color:#e0e0ec">
+                            ${viewMode === 'archive' ? 'Tarefas Arquivadas (Mais recentes)' : 'Tarefas na Lixeira (Mais recentes)'}
+                        </span>
+                        <span class="text-xs px-3 py-1 rounded-full font-bold" style="background:#2a2a44;color:#9090b0">
+                            ${tasks.length} / 27 exibidas
+                        </span>
+                    </div>
+                    ${tasks.length === 0 ? `
+                        <div class="w-full flex flex-col items-center justify-center py-20 text-gray-500">
+                            <i data-lucide="inbox" class="w-16 h-16 mb-4 opacity-20"></i>
+                            <p>Nenhuma tarefa encontrada.</p>
+                        </div>
+                    ` : `
+                        <div id="grid-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full pb-10"></div>
+                    `}
+                </div>
+            `;
+            
+            const gridContainer = document.getElementById('grid-container');
+            if (gridContainer) {
+                tasks.forEach(t => gridContainer.appendChild(window.createTaskCard(t)));
+            }
+            if (window.lucide) window.lucide.createIcons({ scope: container });
+        }
         updateBulkBar();
         return;
     }
@@ -880,24 +935,13 @@ window.renderBoard = async function (data) {
     if (viewMode === 'board') {
         colsToRender = allColumns;
         if (boardTitle) boardTitle.textContent = 'Quadro de Tarefas';
-    } else if (viewMode === 'archive') {
-        const archivedProjects = [...new Set(filtered.map(t => t.project || 'Geral'))];
-        const knownProjects = new Set(['Geral', ...allProjects.map(p => p.name)]);
-        const extraProjects = archivedProjects.filter(p => !knownProjects.has(p));
-
-        colsToRender = [
-            { id: 'proj_Geral', title: 'Geral', color: '#9090b0', filterKey: 'Geral' },
-            ...allProjects.map(p => ({ id: 'proj_' + p.name.replace(/\s+/g, '_'), title: p.name, color: p.color, filterKey: p.name })),
-            ...extraProjects.map(p => ({ id: 'proj_extra_' + p.replace(/\s+/g, '_'), title: p, color: '#6a6a8e', filterKey: p }))
-        ];
-        if (boardTitle) boardTitle.textContent = 'Arquivo (Por Projeto)';
-    } else if (viewMode === 'recycle') {
-        colsToRender = [{ id: 'lixeira', title: 'Lixeira (Últimos 7 dias)', color: '#FF6B8A' }];
-        if (boardTitle) boardTitle.textContent = 'Reciclagem';
     }
 
     const container = document.getElementById('kanban-board-container');
     if (container) {
+        // Restaura as classes originais do board
+        container.className = "flex h-full p-6 pt-2 gap-6 min-w-max";
+        
         let boardHtml = colsToRender.map(col => `
             <div class="flex flex-col" style="width:320px;min-width:300px;flex-shrink:0">
                 <div class="flex items-center justify-between mb-4">
@@ -937,8 +981,6 @@ window.renderBoard = async function (data) {
     colsToRender.forEach(col => {
         let tasks = [];
         if (viewMode === 'board') tasks = filtered.filter(t => t.status === col.id);
-        else if (viewMode === 'archive') tasks = filtered.filter(t => t.project === col.filterKey);
-        else if (viewMode === 'recycle') tasks = filtered;
 
         const colEl = document.getElementById(`col-${col.id}`);
         const countEl = document.getElementById(`count-${col.id}`);
