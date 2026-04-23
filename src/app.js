@@ -1465,12 +1465,20 @@ window.promptNewProject = async function() {
 };
 
 window.openSidebar = () => {
-    document.getElementById('sidebar')?.classList.remove('-translate-x-full');
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) {
+        sidebar.classList.remove('-translate-x-full');
+        sidebar.classList.add('translate-x-0');
+    }
     document.getElementById('sidebar-overlay')?.classList.remove('hidden');
 };
 
 window.closeSidebar = () => {
-    document.getElementById('sidebar')?.classList.add('-translate-x-full');
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) {
+        sidebar.classList.remove('translate-x-0');
+        sidebar.classList.add('-translate-x-full');
+    }
     document.getElementById('sidebar-overlay')?.classList.add('hidden');
 };
 
