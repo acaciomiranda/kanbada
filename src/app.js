@@ -1073,6 +1073,13 @@ function updateBulkBar() {
         bar.classList.remove('hidden');
         const countEl = document.getElementById('selected-count');
         if (countEl) countEl.textContent = selectedTaskIds.length;
+
+        // Popula o select de colunas com as colunas atuais
+        const sel = document.getElementById('bulk-status-select');
+        if (sel) {
+            sel.innerHTML = '<option value="">Mover para...</option>' +
+                allColumns.map(c => `<option value="${c.id}">${c.title}</option>`).join('');
+        }
     } else {
         bar.classList.add('hidden');
     }
@@ -1111,6 +1118,16 @@ window.bulkArchive = async function() {
     selectedTaskIds = [];
     window.renderBoard(allTasks);
     window.showToast('Tarefas arquivadas!');
+};
+
+// Arquivar tarefa individual (botão no card)
+window.archiveTask = async function(taskId) {
+    const task = allTasks.find(t => t.__backendId === taskId);
+    if (!task) return;
+    task.archived = true;
+    await saveTasks(task);
+    window.renderBoard(allTasks);
+    window.showToast(`"${task.title}" arquivada!`);
 };
 
 window.bulkDelete = async function() {
