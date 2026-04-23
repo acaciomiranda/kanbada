@@ -1130,6 +1130,16 @@ window.archiveTask = async function(taskId) {
     window.showToast(`"${task.title}" arquivada!`);
 };
 
+// Restaurar tarefa arquivada (botão no card dentro de Arquivadas)
+window.restoreTask = async function(taskId) {
+    const task = allTasks.find(t => t.__backendId === taskId);
+    if (!task) return;
+    task.archived = false;
+    await saveTasks(task);
+    window.renderBoard(allTasks);
+    window.showToast(`"${task.title}" restaurada!`);
+};
+
 window.bulkDelete = async function() {
     const confirm = await window.customConfirm('Excluir em Massa', `Deseja enviar ${selectedTaskIds.length} tarefas para a lixeira?`, true);
     if (!confirm) return;
@@ -1537,9 +1547,9 @@ function renderProjectsSidebar() {
     const container = document.getElementById('projects-list-container');
     if (!container) return;
 
-    // Projeto Geral sempre aparece primeiro
+    // Projeto Geral — sempre primeiro, sem ações de edição
     const geralItem = `
-        <div class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-all hover:bg-white/5 cursor-pointer ${currentProjectFilter === 'Geral' ? 'bg-white/10 text-white' : 'text-gray-400'}"
+        <div class="group/proj flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-all hover:bg-white/5 cursor-pointer ${currentProjectFilter === 'Geral' ? 'bg-white/10 text-white' : 'text-gray-400'}"
              onclick="window.filterByProject('Geral')">
             <div class="flex items-center gap-3 truncate">
                 <div class="w-2 h-2 rounded-full flex-shrink-0" style="background:#9090b0"></div>
@@ -1548,18 +1558,89 @@ function renderProjectsSidebar() {
         </div>
     `;
 
-    const projectItems = allProjects.map(p => `
-        <div class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-all hover:bg-white/5 cursor-pointer ${currentProjectFilter === p.name ? 'bg-white/10 text-white' : 'text-gray-400'}"
-             onclick="window.filterByProject('${p.name}')">
-            <div class="flex items-center gap-3 truncate">
+    // Projetos do usuário — com ações de editar/arquivar/excluir visíveis no hover
+    const projectItems = allProjects
+        .filter(p => !p.archived)
+        .map(p => `
+        <div class="group/proj flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-all hover:bg-white/5 ${currentProjectFilter === p.name ? 'bg-white/10 text-white' : 'text-gray-400'}">
+            <div class="flex items-center gap-3 truncate flex-1 cursor-pointer" onclick="window.filterByProject('${p.name}')">
                 <div class="w-2 h-2 rounded-full flex-shrink-0" style="background: ${p.color}"></div>
                 <span class="truncate">${p.name}</span>
+            </div>
+            <div class="flex items-center gap-0.5 opacity-0 group-hover/proj:opacity-100 transition-opacity flex-shrink-0">
+                <button onclick="event.stopPropagation(); window.promptEditProject('${p.name}')"
+                    class="p-1 rounded hover:bg-white/10 text-gray-600 hover:text-white transition-colors" title="Editar projeto">
+                    <i data-lucide="edit-2" style="width:11px;height:11px"></i>
+                </button>
+                <button onclick="event.stopPropagation(); window.archiveProject('${p.name}')"
+                    class="p-1 rounded hover:bg-white/10 text-gray-600 hover:text-[#FFB84D] transition-colors" title="Arquivar projeto">
+                    <i data-lucide="archive" style="width:11px;height:11px"></i>
+                </button>
+                <button onclick="event.stopPropagation(); window.promptDeleteProject('${p.name}')"
+                    class="p-1 rounded hover:bg-white/10 text-gray-600 hover:text-[#FF6B8A] transition-colors" title="Excluir projeto">
+                    <i data-lucide="trash-2" style="width:11px;height:11px"></i>
+                </button>
             </div>
         </div>
     `).join('');
 
     container.innerHTML = geralItem + projectItems;
+    if (window.lucide) window.lucide.createIcons({ scope: container });
 }
+
+// --- PROJETOS: EDITAR, ARQUIVAR, EXCLUIR ---
+
+window.promptEditProject = async function(name) {
+    const project = allProjects.find(p => p.name === name);
+    if (!project) return;
+    const newName = await window.customPrompt('Editar Projeto', 'Novo nome do projeto:', project.name);
+    if (!newName || newName === project.name) return;
+
+    // Atualiza referências nas tarefas
+    allTasks.forEach(t => {
+        if (t.project === project.name) t.project = newName;
+    });
+    project.name = newName;
+
+    // Atualiza filtro ativo se estava filtrando por este projeto
+    if (currentProjectFilter === name) currentProjectFilter = newName;
+
+    await saveConfig();
+    // Salva todas as tarefas afetadas
+    const affected = allTasks.filter(t => t.project === newName);
+    for (const t of affected) await saveTasks(t);
+
+    renderProjectsSidebar();
+    window.renderBoard(allTasks);
+    window.showToast(`Projeto renomeado para "${newName}"!`);
+};
+
+window.archiveProject = async function(name) {
+    const project = allProjects.find(p => p.name === name);
+    if (!project) return;
+    project.archived = true;
+    if (currentProjectFilter === name) currentProjectFilter = null;
+    await saveConfig();
+    renderProjectsSidebar();
+    window.renderBoard(allTasks);
+    window.showToast(`Projeto "${name}" arquivado.`);
+};
+
+window.promptDeleteProject = async function(name) {
+    const hasTasks = allTasks.some(t => t.project === name && !t.deleted);
+    if (hasTasks) {
+        window.showToast('Não é possível excluir um projeto com tarefas ativas.', 'error');
+        return;
+    }
+    const confirmed = await window.customConfirm('Excluir Projeto', `Deseja excluir o projeto "${name}"?`, true);
+    if (!confirmed) return;
+    allProjects = allProjects.filter(p => p.name !== name);
+    if (currentProjectFilter === name) currentProjectFilter = null;
+    await saveConfig();
+    renderProjectsSidebar();
+    window.renderBoard(allTasks);
+    window.showToast(`Projeto "${name}" excluído.`);
+};
 
 // Atualiza status de uma tarefa diretamente pela vista em lista
 window.updateTaskStatusFromList = async function(taskId, newStatus) {
