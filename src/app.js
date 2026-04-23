@@ -6,10 +6,8 @@
 // Global Error Logging — console only, never alert() in production
 window.onerror = function(msg, url, line, col, error) {
     console.error('[Kanbada] JS Error:', msg, '| file:', url, '| line:', line, '|', error);
-    // Mostra toast discreto apenas para erros conhecidos que afetam o usuário
-    if (window.showToast && typeof msg === 'string' && !msg.includes('Script error')) {
-        window.showToast('Ocorreu um erro inesperado. Recarregue a página se necessário.', 'error');
-    }
+    // Não exibe toast para erros de script externo ou carregamento inicial
+    // Isso evita que um toast de erro bloqueie a experiência do usuário
     return true; // true = não propaga para o browser (evita console duplicado)
 };
 
@@ -138,11 +136,47 @@ function saveNotifications() {
 
 function loadNotifications() {
     if (!currentUser) return;
-    const saved = localStorage.getItem(`kanbada_notifications_${currentUser.uid}`);
-    if (saved) {
-        notifications = JSON.parse(saved);
-        updateNotificationUI();
+    try {
+        const saved = localStorage.getItem(`kanbada_notifications_${currentUser.uid}`);
+        if (saved) {
+            notifications = JSON.parse(saved);
+            updateNotificationUI();
+        }
+    } catch (e) {
+        console.warn('[Kanbada] Erro ao carregar notificações:', e);
     }
+}
+
+function updateNotificationUI() {
+    const badge = document.getElementById('notif-badge');
+    const list = document.getElementById('notif-list');
+    if (!badge || !list) return;
+
+    if (notifications.length > 0) {
+        badge.classList.remove('hidden');
+        list.innerHTML = notifications.map((n, i) => `
+            <div class="flex items-start gap-3 p-3 rounded-xl hover:bg-white/5 transition-all">
+                <div class="w-2 h-2 rounded-full bg-[#FF6B8A] mt-1.5 flex-shrink-0"></div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs text-gray-300 leading-relaxed">${n.text}</p>
+                    <span class="text-[9px] text-gray-600 mt-1">${n.time || ''}</span>
+                </div>
+            </div>
+        `).join('');
+    } else {
+        badge.classList.add('hidden');
+        list.innerHTML = '<div class="p-4 text-center text-xs text-gray-500 italic">Nenhuma notificação nova</div>';
+    }
+}
+
+function addNotification(text) {
+    const now = new Date();
+    const time = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    notifications.unshift({ text, time });
+    // Mantém no máximo 20 notificações
+    if (notifications.length > 20) notifications = notifications.slice(0, 20);
+    saveNotifications();
+    updateNotificationUI();
 }
 
 async function saveConfig() {
