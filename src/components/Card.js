@@ -46,7 +46,7 @@ window.createTaskCard = function(task) {
                 </div>
                 <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onclick="window.editTask('${id}')" class="p-1 text-gray-500 hover:text-white" title="Editar"><i data-lucide="edit-2" class="w-3 h-3"></i></button>
-                    ${task.archived
+                    ${(task.archived || task.deleted)
                         ? `<button onclick="event.stopPropagation(); window.restoreTask('${id}')" class="p-1 text-[#00C9A7] hover:text-[#00C9A7]/80" title="Restaurar tarefa"><i data-lucide="archive-restore" class="w-3 h-3"></i></button>`
                         : `<button onclick="event.stopPropagation(); window.archiveTask('${id}')" class="p-1 text-gray-500 hover:text-[#FFB84D]" title="Arquivar"><i data-lucide="archive" class="w-3 h-3"></i></button>`
                     }

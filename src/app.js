@@ -1172,11 +1172,13 @@ window.archiveTask = async function(taskId) {
     window.showToast(`"${task.title}" arquivada!`);
 };
 
-// Restaurar tarefa arquivada (botão no card dentro de Arquivadas)
+// Restaurar tarefa arquivada ou excluída
 window.restoreTask = async function(taskId) {
     const task = allTasks.find(t => t.__backendId === taskId);
     if (!task) return;
     task.archived = false;
+    task.deleted = false;
+    task.deletedAt = null;
     await saveTasks(task);
     window.renderBoard(allTasks);
     window.showToast(`"${task.title}" restaurada!`);
@@ -1579,8 +1581,9 @@ function updateProjectSelects() {
     const selects = document.querySelectorAll('#f-project');
     selects.forEach(s => {
         const current = s.value;
+        const activeProjects = allProjects.filter(p => !p.archived);
         s.innerHTML = '<option value="Geral">Geral</option>' +
-            allProjects.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+            activeProjects.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
         s.value = current || 'Geral';
     });
 }
