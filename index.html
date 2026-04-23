@@ -226,11 +226,6 @@
                             <i data-lucide="download" class="w-4 h-4 group-hover:scale-110 transition-transform"></i>
                         </button>
                     </div>
-                    
-                    <button onclick="window.promptNewColumn()" class="md:flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all border border-[#2a2a44] hover:bg-white/5 text-[#9090b0] hover:text-white">
-                        <i data-lucide="plus" class="w-4 h-4"></i>
-                        <span class="hidden lg:inline">Nova Coluna</span>
-                    </button>
                 </div>
             </div>
 
@@ -350,14 +345,18 @@
                         <!-- Anexo de Arquivos -->
                         <div class="pt-4 border-t border-[#2a2a44]">
                             <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Anexo (Opcional)</label>
-                            <div class="relative">
+                            
+                            <!-- Preview do anexo existente -->
+                            <div id="attachment-preview" class="mb-2 hidden"></div>
+
+                            <!-- Área de upload (some quando há preview) -->
+                            <div id="attachment-upload-area" class="relative">
                                 <input type="file" id="f-file" class="hidden">
                                 <button type="button" onclick="document.getElementById('f-file').click()" 
                                     class="w-full bg-[#12121f] border-2 border-dashed border-[#2a2a44] hover:border-[#FF6B8A] hover:bg-[#FF6B8A]/5 rounded-xl p-4 transition-all group">
                                     <div class="flex flex-col items-center gap-1 text-gray-500 group-hover:text-[#FF6B8A]">
                                         <i data-lucide="paperclip" class="w-5 h-5"></i>
                                         <span class="text-[10px] font-bold uppercase tracking-widest">Selecionar Arquivo (Max 1MB)</span>
-                                        <span id="file-name-display" class="text-[9px] lowercase italic mt-1 hidden"></span>
                                     </div>
                                 </button>
                             </div>
@@ -462,13 +461,13 @@
     </script>
 
     <!-- App Scripts — componentes ANTES do app.js (app.js depende deles) -->
-    <script src="src/services/auth.service.js?v=10"></script>
-    <script src="src/services/db.service.js?v=10"></script>
-    <script src="src/services/data_mapper.js?v=10"></script>
-    <script src="src/components/Login.js?v=10"></script>
-    <script src="src/components/Card.js?v=10"></script>
-    <script src="src/components/Column.js?v=10"></script>
-    <script src="src/app.js?v=10"></script>
+    <script src="src/services/auth.service.js?v=11"></script>
+    <script src="src/services/db.service.js?v=11"></script>
+    <script src="src/services/data_mapper.js?v=11"></script>
+    <script src="src/components/Login.js?v=11"></script>
+    <script src="src/components/Card.js?v=11"></script>
+    <script src="src/components/Column.js?v=11"></script>
+    <script src="src/app.js?v=11"></script>
 
     <script>
         // Previne erros de carregamento se o Lucide falhar

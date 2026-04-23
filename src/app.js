@@ -274,6 +274,15 @@ window.openModal = function(status = 'plan', taskId = null) {
     editingTaskId = taskId;
     const titleEl = document.getElementById('modal-title');
     const form = document.getElementById('task-form');
+
+    // Reset da área de anexo
+    const fileInput = document.getElementById('f-file');
+    const fileNameDisplay = document.getElementById('file-name-display');
+    const attachmentPreview = document.getElementById('attachment-preview');
+    if (fileInput) fileInput.value = '';
+    if (fileNameDisplay) { fileNameDisplay.textContent = ''; fileNameDisplay.classList.add('hidden'); }
+    if (attachmentPreview) attachmentPreview.classList.add('hidden');
+    window._currentAttachment = null; // limpa anexo pendente
     
     if (taskId) {
         titleEl.textContent = 'Editar Tarefa';
@@ -287,6 +296,12 @@ window.openModal = function(status = 'plan', taskId = null) {
             document.getElementById('f-priority').value = task.priority || 'Média';
             document.getElementById('f-due-date').value = task.due_date || '';
             currentEditingSubtasks = [...(task.subtasks || [])];
+
+            // Carrega anexo existente
+            if (task.attachment && task.attachment.data) {
+                window._currentAttachment = task.attachment;
+                renderAttachmentPreview(task.attachment);
+            }
         }
     } else {
         titleEl.textContent = 'Nova Tarefa';
@@ -295,8 +310,78 @@ window.openModal = function(status = 'plan', taskId = null) {
         currentEditingSubtasks = [];
     }
 
+    // Wiring do input de arquivo
+    if (fileInput) {
+        fileInput.onchange = function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (file.size > 1.5 * 1024 * 1024) {
+                window.showToast('Arquivo muito grande. Máximo 1MB.', 'error');
+                fileInput.value = '';
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                window._currentAttachment = {
+                    name: file.name,
+                    type: file.type,
+                    size: file.size,
+                    data: ev.target.result // base64
+                };
+                renderAttachmentPreview(window._currentAttachment);
+            };
+            reader.readAsDataURL(file);
+        };
+    }
+
     renderSubtasks();
     modal.classList.remove('hidden');
+};
+
+function renderAttachmentPreview(attachment) {
+    const preview = document.getElementById('attachment-preview');
+    const uploadArea = document.getElementById('attachment-upload-area');
+    if (!preview || !attachment) return;
+
+    const isImage = attachment.type && attachment.type.startsWith('image/');
+    const sizeKB = attachment.size ? (attachment.size / 1024).toFixed(0) : '?';
+
+    preview.innerHTML = `
+        <div class="flex items-center gap-3 p-3 bg-[#12121f] rounded-xl border border-[#2a2a44] group">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style="background:#6C63FF20">
+                <i data-lucide="${isImage ? 'image' : 'file'}" class="w-4 h-4" style="color:#6C63FF"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="text-xs font-bold text-white truncate">${attachment.name}</p>
+                <p class="text-[9px] text-gray-500">${sizeKB} KB</p>
+            </div>
+            <div class="flex items-center gap-1">
+                <a href="${attachment.data}" download="${attachment.name}"
+                    class="p-1.5 rounded-lg hover:bg-[#6C63FF]/20 text-gray-500 hover:text-[#6C63FF] transition-all"
+                    title="Baixar anexo">
+                    <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                </a>
+                <button type="button" onclick="window.removeAttachment()" 
+                    class="p-1.5 rounded-lg hover:bg-[#FF6B8A]/20 text-gray-500 hover:text-[#FF6B8A] transition-all"
+                    title="Remover anexo">
+                    <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    preview.classList.remove('hidden');
+    if (uploadArea) uploadArea.classList.add('hidden');
+    if (window.lucide) window.lucide.createIcons({ scope: preview });
+}
+
+window.removeAttachment = function() {
+    window._currentAttachment = null;
+    const preview = document.getElementById('attachment-preview');
+    const uploadArea = document.getElementById('attachment-upload-area');
+    const fileInput = document.getElementById('f-file');
+    if (preview) preview.classList.add('hidden');
+    if (uploadArea) uploadArea.classList.remove('hidden');
+    if (fileInput) fileInput.value = '';
 };
 
 window.closeModal = function() {
@@ -316,6 +401,18 @@ window.handleSubmit = async function(e) {
         subtasks: currentEditingSubtasks,
         createdAt: new Date().toISOString()
     };
+
+    // Salva o anexo se houver um pendente
+    if (window._currentAttachment) {
+        taskData.attachment = window._currentAttachment;
+    } else if (editingTaskId) {
+        // Se editando e sem novo anexo, mantém o existente (ou null se removeu)
+        const existing = allTasks.find(t => t.__backendId === editingTaskId);
+        if (existing && existing.attachment && window._currentAttachment !== null) {
+            // _currentAttachment null = removido pelo usuário; undefined = não alterado
+            taskData.attachment = existing.attachment;
+        }
+    }
     
     let task;
     if (editingTaskId) {
@@ -333,6 +430,7 @@ window.handleSubmit = async function(e) {
     window.renderBoard(allTasks);
     window.closeModal();
     window.showToast(editingTaskId ? 'Tarefa atualizada!' : 'Tarefa criada!');
+    window._currentAttachment = undefined; // reset para próxima abertura
 };
 
 window.addSubtask = function() {
@@ -933,10 +1031,11 @@ function renderListView(tasks) {
                                 </div>
                             </td>
                             <td class="px-6 py-4">
-                                <span class="px-2 py-1 rounded-full text-[10px] font-bold" 
+                                <select onchange="window.updateTaskStatusFromList('${t.__backendId}', this.value)"
+                                    class="text-[10px] font-bold px-2 py-1 rounded-full border-0 outline-none cursor-pointer appearance-none"
                                     style="background:${allColumns.find(c => c.id === t.status)?.color}20; color:${allColumns.find(c => c.id === t.status)?.color}">
-                                    ${allColumns.find(c => c.id === t.status)?.title || t.status}
-                                </span>
+                                    ${allColumns.map(c => `<option value="${c.id}" ${c.id === t.status ? 'selected' : ''} style="background:#1e1e36;color:#e0e0ec">${c.title}</option>`).join('')}
+                                </select>
                             </td>
                             <td class="px-6 py-4">
                                 <div class="flex items-center gap-2">
@@ -1420,8 +1519,20 @@ function updateProjectSelects() {
 function renderProjectsSidebar() {
     const container = document.getElementById('projects-list-container');
     if (!container) return;
-    container.innerHTML = allProjects.map(p => `
-        <div class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-all hover:bg-white/5 cursor-pointer ${currentProjectFilter === p.name ? 'bg-white/10 text-white' : 'text-gray-400'}" 
+
+    // Projeto Geral sempre aparece primeiro
+    const geralItem = `
+        <div class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-all hover:bg-white/5 cursor-pointer ${currentProjectFilter === 'Geral' ? 'bg-white/10 text-white' : 'text-gray-400'}"
+             onclick="window.filterByProject('Geral')">
+            <div class="flex items-center gap-3 truncate">
+                <div class="w-2 h-2 rounded-full flex-shrink-0" style="background:#9090b0"></div>
+                <span class="truncate">Geral</span>
+            </div>
+        </div>
+    `;
+
+    const projectItems = allProjects.map(p => `
+        <div class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-all hover:bg-white/5 cursor-pointer ${currentProjectFilter === p.name ? 'bg-white/10 text-white' : 'text-gray-400'}"
              onclick="window.filterByProject('${p.name}')">
             <div class="flex items-center gap-3 truncate">
                 <div class="w-2 h-2 rounded-full flex-shrink-0" style="background: ${p.color}"></div>
@@ -1429,4 +1540,16 @@ function renderProjectsSidebar() {
             </div>
         </div>
     `).join('');
+
+    container.innerHTML = geralItem + projectItems;
 }
+
+// Atualiza status de uma tarefa diretamente pela vista em lista
+window.updateTaskStatusFromList = async function(taskId, newStatus) {
+    const task = allTasks.find(t => t.__backendId === taskId);
+    if (!task || task.status === newStatus) return;
+    task.status = newStatus;
+    await saveTasks(task);
+    const col = allColumns.find(c => c.id === newStatus);
+    window.showToast(`Movida para "${col?.title || newStatus}"`);
+};
